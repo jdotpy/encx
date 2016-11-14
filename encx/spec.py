@@ -28,43 +28,28 @@ class EncryptionInterchangeFile():
         stream.write(encoded_metadata)
         return stream
 
-    def to_file(self, path):
-        with open(path, 'wb') as f:
-            self._create_header(f, self.metadata)
-            f.write(self.payload.read())
+    def to_file(self, target):
+        if isinstance(target, str):
+            with open(target, 'wb') as f:
+                self._create_header(f, self.metadata)
+                target.write(self.payload.read())
+        else:
+            self._create_header(target, self.metadata)
+            target.write(self.payload.read())
 
-    def load_file(self, path):
-        with open(path, 'rb') as f:
-            self.metadata = self._parse_header(f)
-            self.payload = io.BytesIO(f.read())
+    def load_file(self, target):
+        if isinstance(target, str):
+            with open(target, 'rb') as f:
+                self.metadata = self._parse_header(f)
+                self.payload = io.BytesIO(f.read())
+        else:
+            self.metadata = self._parse_header(target)
+            self.payload = io.BytesIO(target.read())
 
     @classmethod
-    def from_file(cls, path):
+    def from_file(cls, target):
         new_obj = cls()
-        new_obj.load_file(path)
+        new_obj.load_file(target)
         return new_obj
 
 ENCX = EncryptionInterchangeFile
-
-def main():
-    metadata = {'foo': 'bar', 'dataz': 42}
-    with open('/dev/urandom', 'rb') as f:
-        random_bytes = f.read(40)
-
-    filename = 'foo.encx'
-
-    print('Writing file...')
-    ex = ENCX(metadata, io.BytesIO(random_bytes))
-    ex.to_file(filename)
-    print('...done!')
-
-    print('Reading file...')
-    reloaded = ENCX.from_file(filename)
-    print('...done!')
-
-    assert reloaded.metadata == metadata
-    assert reloaded.payload.read() == random_bytes
-
-
-if __name__ == '__main__':
-    main()
