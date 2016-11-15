@@ -11,13 +11,14 @@ CLI providing file encryption capability using the encx file format.
 	decrypt.py encrypted_file.txt -s AES -k "Rvq/bDuo6w60EsCobBqpfg==" > decrypted-file.txt
 
 	# RSA-AES (RSA encrypted AES key packaged with data)
-	encrypt.py cleartext.txt > encrypted_file.txt -s RSA-AES -k "Rvq/bDuo6w60EsCobBqpfg=="
+	encrypt.py cleartext.txt > encrypted_file.txt -s RSA-AES -k ~/.ssh/id_rsa (pub key is derived)
 	decrypt.py encrypted_file.txt -k ~/.ssh/id_rsa > decrypted-file.txt
 
 **Known Issues**: 
 
-* Encrypted RSA keys are not supported at this time.
-* Optimization has not taken place and so files to decrypt or encrypt are read entirely in memory and thus is limited by the size of your RAM.
+* Maximum file size for all operations limited by size of memory due to the entire file being read. 
+* Limited number of RSA key formats supported.
+* No good way to generate keys at this time besides using a different tool (i'm deciding whether to bundle one :P)
 * The CLI supplies no way to examine the metadata or add to the metadata (it is just used for the encryption scheme's metadata right now).
 
 **What is the encx file format?**: 
@@ -34,5 +35,5 @@ it (given the right key of course). The result is a fileformat with 4 parts:
 * N bytes - The rest of the bytes in the file are the binary payload, presumably encrypted.
 
 The rules:
-	- The metadata should have a root property of "scheme" which indicates 
+* The metadata should have a root property of "scheme" which indicates the encryption algorithm, version, IV, mode or anything else the decryptor would need to know.
 

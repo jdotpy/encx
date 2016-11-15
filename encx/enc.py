@@ -2,6 +2,7 @@ from Crypto.Cipher import PKCS1_OAEP, AES
 from Crypto.PublicKey import RSA
 from Crypto import Random
 
+from getpass import getpass
 import base64
 import io
 import os
@@ -86,11 +87,18 @@ class RSAScheme():
         return io.BytesIO(exported_key)
 
     def _set_key(self, key):
+        # Get the raw key from file or file obj
         if isinstance(key, str):
             with open(key) as f:
-                self.key = RSA.importKey(f.read())
+                key_bytes = f.read()
         else:
-            self.key = RSA.importKey(key.read())
+            key_bytes = key.read()
+
+        if 'ENCRYPTED' in key_bytes:
+            passphrase = getpass('Enter the passphrase for the key: ')
+        else:
+            passphrase = None
+        self.key = RSA.importKey(key_bytes, passphrase=passphrase)
 
     def encrypt(self, payload):
         aes_key = AESScheme.generate_key()
