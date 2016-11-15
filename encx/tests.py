@@ -38,7 +38,7 @@ class EncryptionSchemeTests(unittest.TestCase):
 
             # Encrypt our value
             enc_scheme = Scheme(metadata)
-            ciphertext = enc_scheme.encrypt(my_value)
+            ciphertext = enc_scheme.encrypt(io.BytesIO(my_value))
             key = enc_scheme.get_key()
 
 
@@ -46,7 +46,7 @@ class EncryptionSchemeTests(unittest.TestCase):
             dec_scheme = Scheme(metadata, key=key)
             payload = dec_scheme.decrypt(ciphertext)
 
-            self.assertEqual(payload, my_value)
+            self.assertEqual(payload.read(), my_value)
 
 class FileFormatTest(unittest.TestCase):
     def test_basic(self):

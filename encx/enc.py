@@ -3,6 +3,7 @@ from Crypto.PublicKey import RSA
 from Crypto import Random
 
 import base64
+import io
 import os
 
 def generate_secret_key(length=128):
@@ -52,26 +53,64 @@ class AESScheme():
         self.metadata['iv'] = to_b64_str(iv)
         self.metadata['mode'] = 'CFB'
         self.cipher = AES.new(self.key, AES.MODE_CFB, iv)
-        ciphertext = self.cipher.encrypt(payload)
-        return ciphertext
+        ciphertext = self.cipher.encrypt(payload.read())
+        return io.BytesIO(ciphertext)
 
     def decrypt(self, ciphertext):
         iv = from_b64_str(self.metadata['iv'])
         self.cipher = AES.new(self.key, AES.MODE_CFB, iv)
         payload = self.cipher.decrypt(iv + ciphertext.read())
         payload = payload[AES.block_size:]
-        return payload
+        return io.BytesIO(payload)
 
-class RSA():
+class RSAScheme():
     name = 'RSA-AES'
+    key_size = 2048
 
     def __init__(self, metadata, key=None):
         self.metadata = metadata
-        if key is None:
+        if not key:
             key = self.generate_key()
-        self.set_key(key)
+        self._set_key(key)
+        self.cipher = PKCS1_OAEP.new(self.key)
 
+    @classmethod
+    def generate_key(cls):
+        new_key = RSA.generate(cls.key_size)
+        exported_obj = new_key.exportKey("PEM")
+        return io.BytesIO(exported_obj)
 
+    def get_key(self):
+        exported_key = self.key.exportKey("PEM")
+        return io.BytesIO(exported_key)
 
-all_schemes = [AESScheme]
+    def _set_key(self, key):
+        if isinstance(key, str):
+            with open(key) as f:
+                self.key = RSA.importKey(f.read())
+        else:
+            self.key = RSA.importKey(key.read())
+
+    def encrypt(self, payload):
+        aes_key = AESScheme.generate_key()
+        encrypted_key = self.cipher.encrypt(aes_key)
+        aes = AESScheme({}, key=aes_key)
+        self.payload = aes.encrypt(payload)
+        self.metadata['aes-mode'] = aes.metadata['mode']
+        self.metadata['aes-iv'] = aes.metadata['iv']
+        self.metadata['aes-key'] = to_b64_str(encrypted_key)
+        return self.payload
+
+    def decrypt(self, ciphertext):
+        aes_metadata = {
+            'mode': self.metadata['aes-mode'],
+            'iv': self.metadata['aes-iv']
+        }
+        encrypted_key = from_b64_str(self.metadata['aes-key'])
+        aes_key = self.cipher.decrypt(encrypted_key)
+        aes = AESScheme(aes_metadata, key=aes_key)
+        self.payload = aes.decrypt(ciphertext)
+        return self.payload
+
+all_schemes = [AESScheme, RSAScheme]
 schemes = {scheme.name: scheme for scheme in all_schemes}
