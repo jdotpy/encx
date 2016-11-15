@@ -58,9 +58,20 @@ class AESScheme():
     def decrypt(self, ciphertext):
         iv = from_b64_str(self.metadata['iv'])
         self.cipher = AES.new(self.key, AES.MODE_CFB, iv)
-        payload = self.cipher.decrypt(iv + ciphertext)
+        payload = self.cipher.decrypt(iv + ciphertext.read())
         payload = payload[AES.block_size:]
         return payload
+
+class RSA():
+    name = 'RSA-AES'
+
+    def __init__(self, metadata, key=None):
+        self.metadata = metadata
+        if key is None:
+            key = self.generate_key()
+        self.set_key(key)
+
+
 
 all_schemes = [AESScheme]
 schemes = {scheme.name: scheme for scheme in all_schemes}

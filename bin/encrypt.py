@@ -23,12 +23,12 @@ def encrypt_command():
     parser = argparse.ArgumentParser(description='Encrypt into encx format.')
     parser.add_argument('source', nargs="?", help='A file source')
     parser.add_argument('-s', '--scheme', dest='scheme', help='Scheme to use to encrypt', default=DEFAULT_SCHEME.name)
-    parser.add_argument('-k', '--key', dest='key', help='Key to use to decrypt')
+    parser.add_argument('-k', '--key', dest='key', help='Key to use to decrypt', default=None)
     args = parser.parse_args()
 
     source_data = read_data(args.source)
     scheme = schemes.get(args.scheme)
-    output = create_file(payload=source_data, Scheme=scheme)
+    output = create_file(payload=source_data, Scheme=scheme, key=args.key)
     output.seek(0)
     sys.stdout.buffer.write(output.read())
 
