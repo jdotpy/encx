@@ -65,6 +65,7 @@ class AESScheme():
 
 class RSAScheme():
     name = 'RSA-AES'
+    cipher_name = 'PKCS#1 v1.5 OAEP'
     key_size = 2048
 
     def __init__(self, metadata, key=None):
@@ -96,6 +97,8 @@ class RSAScheme():
         encrypted_key = self.cipher.encrypt(aes_key)
         aes = AESScheme({}, key=aes_key)
         self.payload = aes.encrypt(payload)
+        self.metadata['scheme'] = self.name
+        self.metadata['cipher'] = self.cipher_name
         self.metadata['aes-mode'] = aes.metadata['mode']
         self.metadata['aes-iv'] = aes.metadata['iv']
         self.metadata['aes-key'] = to_b64_str(encrypted_key)

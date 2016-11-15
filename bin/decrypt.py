@@ -32,7 +32,7 @@ def decrypt_command():
         print('Scheme {} is not supported by this implementation'.format(scheme_name))
         sys.exit(1)
     scheme = schemes[scheme_name](encx_file.metadata, key=args.key)
-    decrypted_data = scheme.decrypt(encx_file.payload)
+    decrypted_data = scheme.decrypt(encx_file.payload).read()
     if args.decode:
         print(decrypted_data.decode('utf-8'))
     else:

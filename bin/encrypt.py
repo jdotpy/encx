@@ -15,8 +15,8 @@ def create_file(metadata=None, payload=None, Scheme=DEFAULT_SCHEME, file_obj=Non
     if file_obj is None:
         file_obj = io.BytesIO()
     scheme = Scheme(metadata, key=key)
-    encrypted_payload = scheme.encrypt(payload)
-    encx_file = ENCX(metadata, io.BytesIO(encrypted_payload))
+    encrypted_payload = scheme.encrypt(io.BytesIO(payload))
+    encx_file = ENCX(metadata, encrypted_payload)
     return encx_file.to_file(file_obj)
 
 def encrypt_command():
