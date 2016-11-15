@@ -36,6 +36,7 @@ class EncryptionInterchangeFile():
         else:
             self._create_header(target, self.metadata)
             target.write(self.payload.read())
+        return target
 
     def load_file(self, target):
         if isinstance(target, str):
