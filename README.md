@@ -9,11 +9,11 @@ CLI providing file encryption capability using the encx file format.
 	## Encrypt+Decrypt operations ##
 
 	# AES 
-	encrypt.py cleartext.txt > encrypted_file.txt -s AES -k "Rvq/bDuo6w60EsCobBqpfg=="
+	encrypt.py cleartext.txt -s AES -k "Rvq/bDuo6w60EsCobBqpfg==" > encrypted_file.txt
 	decrypt.py encrypted_file.txt -k "Rvq/bDuo6w60EsCobBqpfg==" > decrypted-file.txt
 
 	# RSA-AES (RSA encrypted AES key packaged with data)
-	encrypt.py cleartext.txt > encrypted_file.txt -s RSA-AES -k ~/.ssh/id_rsa
+	encrypt.py cleartext.txt -s RSA-AES -k ~/.ssh/id_rsa > encrypted_file.txt
 	decrypt.py encrypted_file.txt -k ~/.ssh/id_rsa > decrypted-file.txt
 
 	## Key Generation ##
