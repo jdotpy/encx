@@ -8,10 +8,10 @@ CLI providing file encryption capability using the encx file format.
 
 	# AES 
 	encrypt.py cleartext.txt > encrypted_file.txt -s AES -k "Rvq/bDuo6w60EsCobBqpfg=="
-	decrypt.py encrypted_file.txt -s AES -k "Rvq/bDuo6w60EsCobBqpfg==" > decrypted-file.txt
+	decrypt.py encrypted_file.txt -k "Rvq/bDuo6w60EsCobBqpfg==" > decrypted-file.txt
 
 	# RSA-AES (RSA encrypted AES key packaged with data)
-	encrypt.py cleartext.txt > encrypted_file.txt -s RSA-AES -k ~/.ssh/id_rsa (pub key is derived)
+	encrypt.py cleartext.txt > encrypted_file.txt -s RSA-AES -k ~/.ssh/id_rsa
 	decrypt.py encrypted_file.txt -k ~/.ssh/id_rsa > decrypted-file.txt
 
 **Known Issues**: 
@@ -22,6 +22,8 @@ CLI providing file encryption capability using the encx file format.
 * The CLI supplies no way to examine the metadata or add to the metadata (it is just used for the encryption scheme's metadata right now).
 
 **What is the encx file format?**: 
+
+Encryption Interchange file.
 
 I saw a need for a file format that would allow for a binary payload (of encrypted data) to be
 packaged along with metadata that would explain how it was stored and any other piece of metadata

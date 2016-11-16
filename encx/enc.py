@@ -67,7 +67,7 @@ class AESScheme():
 class RSAScheme():
     name = 'RSA-AES'
     cipher_name = 'PKCS#1 v1.5 OAEP'
-    key_size = 2048
+    default_key_size = 2048
 
     def __init__(self, metadata, key=None):
         self.metadata = metadata
@@ -77,8 +77,10 @@ class RSAScheme():
         self.cipher = PKCS1_OAEP.new(self.key)
 
     @classmethod
-    def generate_key(cls):
-        new_key = RSA.generate(cls.key_size)
+    def generate_key(cls, size=None):
+        if not size:
+            size = cls.key_size
+        new_key = RSA.generate(size)
         exported_obj = new_key.exportKey("PEM")
         return io.BytesIO(exported_obj)
 
