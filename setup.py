@@ -18,5 +18,6 @@ setup(
     scripts=[
         'bin/encrypt.py',
         'bin/decrypt.py',
+        'bin/keygen.py',
     ],
 )
