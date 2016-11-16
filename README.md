@@ -43,7 +43,6 @@ CLI providing file encryption capability using the encx file format.
 
 * Maximum file size for all operations limited by size of memory due to the entire file being read. 
 * Limited number of RSA key formats supported.
-* No good way to generate keys at this time besides using a different tool (i'm deciding whether to bundle one :P)
 * The CLI supplies no way to examine the metadata or add to the metadata (it is just used for the encryption scheme's metadata right now).
 
 **What is the encx file format?**: 
