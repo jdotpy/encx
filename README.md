@@ -6,6 +6,8 @@ CLI providing file encryption capability using the encx file format.
 
 **Basic Usage**: 
 
+	## Encrypt+Decrypt operations ##
+
 	# AES 
 	encrypt.py cleartext.txt > encrypted_file.txt -s AES -k "Rvq/bDuo6w60EsCobBqpfg=="
 	decrypt.py encrypted_file.txt -k "Rvq/bDuo6w60EsCobBqpfg==" > decrypted-file.txt
@@ -13,6 +15,29 @@ CLI providing file encryption capability using the encx file format.
 	# RSA-AES (RSA encrypted AES key packaged with data)
 	encrypt.py cleartext.txt > encrypted_file.txt -s RSA-AES -k ~/.ssh/id_rsa
 	decrypt.py encrypted_file.txt -k ~/.ssh/id_rsa > decrypted-file.txt
+
+	## Key Generation ##
+
+	# RSA Pem format
+	keygen.py rsa -s 2048 > my_file.pem 
+	keygen.py rsa -s 2048 -k my_file.pem -p my_public_key.pub
+
+	# AES-ready key
+	$ keygen.py key
+	PJPKMG59Ai6uQfgDTbGs1w==
+
+	# Strings/passwords
+	$ keygen.py string 
+	LTXgUHLWGJQnsBFhiitk
+	$ keygen.py string --source "1234567890abcdef" -l 4
+	980e4ebc9e4aa594a25f
+	$ keygen.py string -s "[]{}" -l 4
+	{[]]
+
+	# UUIDs
+	$ keygen.py uuid
+	7a8f6755-f4f8-ac40-7962-c0df9c9a4b64
+
 
 **Known Issues**: 
 
