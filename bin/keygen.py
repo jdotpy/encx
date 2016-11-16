@@ -7,10 +7,8 @@ from getpass import getpass
 import argparse
 import base64
 import string
-import random
 import uuid
 import sys
-import os
 
 def random_bytes(size):
     return Random.new().read(size)
@@ -35,8 +33,7 @@ def generate_uuid(args):
     print(uuid.UUID(bytes=random_bytes(16)))
 
 def generate_random_string(args):
-    sys_random = random.SystemRandom()
-    selections = [sys_random.choice(args.source) for i in range(args.length)]
+    selections = [random.choice(args.source) for i in range(args.length)]
     print(''.join(selections))
 
 def generate_rsa_key(args):
