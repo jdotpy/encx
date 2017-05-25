@@ -8,3 +8,4 @@
 
 # Project Specific
 .venv
+.pyenv

@@ -3,11 +3,12 @@ import base64
 import io
 
 from .spec import ENCX
-from .enc import (
+from .security import (
     generate_random_bytes,
     to_b64_str, from_b64_str,
-    all_schemes
+    AES, RSA
 )
+from .schemes import all_schemes
 
 class UtilityTests(unittest.TestCase):
     def test_random_bytes(self):
@@ -37,16 +38,16 @@ class EncryptionSchemeTests(unittest.TestCase):
             metadata = {}
 
             # Encrypt our value
-            enc_scheme = Scheme(metadata)
-            ciphertext = enc_scheme.encrypt(io.BytesIO(my_value))
-            key = enc_scheme.get_key()
+            key = Scheme.generate_key()
+            enc_scheme = Scheme(key)
+            ciphertext, meta = enc_scheme.encrypt(my_value)
 
 
             # ... and back again
-            dec_scheme = Scheme(metadata, key=key)
-            payload = dec_scheme.decrypt(ciphertext)
+            dec_scheme = Scheme(key)
+            payload = dec_scheme.decrypt(ciphertext, meta)
 
-            self.assertEqual(payload.read(), my_value)
+            self.assertEqual(payload, my_value)
 
 class FileFormatTest(unittest.TestCase):
     def test_basic(self):
