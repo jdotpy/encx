@@ -22,7 +22,7 @@ def load_rsa_key(path):
     if 'ENCRYPTED' in key_contents:
         passphrase = getpass('Enter the passphrase for "{}": '.format(path))
     
-    return RSA(key_contents, passphrase)
+    return RSA(key_contents, passphrase).get_private_key()
 
 def generate_uuid():
     return str(uuid4())

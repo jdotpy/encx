@@ -22,8 +22,14 @@ class BaseScheme():
     def __init__(self, key, options=None):
         if not key:
             raise ValueError('All encx encryption schemes require a key!')
-        self.key = key
+        self.key = self._load_key(key)
         self.options = options 
+
+    def _load_key(self, key):
+        if self.key_type == self.KEY_TYPE_RSA:
+            return security.load_rsa_key(key)
+        else:
+            return key
 
     def encrypt(self, payload):
         raise NotImplemented();
@@ -42,6 +48,7 @@ class AESScheme(BaseScheme):
     def encrypt(self, payload):
         encryptor = security.AES(self.key)
         ciphertext, metadata = encryptor.encrypt(payload)
+        metadata['scheme'] = self.name
         return ciphertext, metadata
 
     def decrypt(self, ciphertext, meta):
@@ -73,6 +80,7 @@ class RSAScheme(BaseScheme):
 
         encrypted_key = security.to_b64_str(rsa_ciphertext)
         meta = {
+            'scheme': self.name,
             'aes': aes_metadata,
             'rsa': rsa_metadata,
             'encrypted_key': encrypted_key,
@@ -104,6 +112,7 @@ class RSAScheme(BaseScheme):
 
 all_schemes = [AESScheme, RSAScheme]
 schemes = {scheme.name: scheme for scheme in all_schemes}
+DEFAULT_SCHEME = RSAScheme
 
 def get_scheme(meta):
     """
@@ -115,8 +124,8 @@ def get_scheme(meta):
     """
     scheme_name = meta.get('scheme', None)
     if not scheme_name:
-        ValueError('"scheme" property was not specified. Invalid encx metadata.')
+        raise ValueError('"scheme" property was not specified. Invalid encx metadata.')
     scheme = schemes.get(scheme_name, None)
     if not scheme:
-        ValueError('Scheme "{}" is unsupported by this implementation of encx'.format(scheme_name))
+        raise ValueError('Scheme "{}" is unsupported by this implementation of encx'.format(scheme_name))
     return scheme

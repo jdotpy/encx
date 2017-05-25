@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+
+from encxlib.client import EncxClient
+
+import sys
+
+def main():
+    client = EncxClient()
+    client.command(sys.argv[1:])
+
+if __name__ == '__main__':
+    main()
