@@ -5,15 +5,15 @@ from distutils.core import setup
 setup(
     name='encx',
     version='0.1',
-    description='Encryption CLI and implementation of the encx file format.',
+    description='Encryption CLI tool and implementation of the encx file format.',
     author='KJ',
     author_email='<redacted>',
-    url='<TBD>',
+    url='https://github.com/jdotpy/encx',
     packages=[
-        'encx',
+        'encxlib',
     ],
     install_requires=[
-        'pycrypto'
+        'cryptography'
     ],
     scripts=[
         'bin/encrypt.py',

@@ -2,11 +2,19 @@
 
 from encxlib.client import EncxClient
 
+import argparse
 import sys
 
+
+def global_parser():
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument('-c', '--config', help="Path to configuration file")
+    return parser.parse_known_args()
+
 def main():
+    global_args, remaining_args = global_parser()
     client = EncxClient()
-    client.command(sys.argv[1:])
+    client.command(remaining_args)
 
 if __name__ == '__main__':
     main()

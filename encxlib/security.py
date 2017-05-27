@@ -6,21 +6,26 @@ from cryptography.exceptions import InvalidSignature
 
 
 from getpass import getpass
+from uuid import uuid4
 import logging
 import base64
+import stat
+import sys
 import io
 import os
-import stat
-from uuid import uuid4
 
 
 class SecurityError(ValueError):
     pass
 
-def load_rsa_key(path):
-    key_contents = read_private_path(path)
+def load_rsa_key(source, path=True, passphrase=None):
+    if path:
+        key_contents = read_private_path(path)
+    else:
+        key_contents = source
     if 'ENCRYPTED' in key_contents:
-        passphrase = getpass('Enter the passphrase for "{}": '.format(path))
+        if passphrase is None:
+            passphrase = getpass('Enter the passphrase for "{}": '.format(path))
     
     return RSA(key_contents, passphrase).get_private_key()
 
@@ -41,6 +46,17 @@ def hasher(data, raw=False):
 
 def generate_random_bytes(size=64):
     return os.urandom(size)
+
+def generate_int(start=0, end=sys.maxsize):
+    """ inclusive to exclusive """
+    delta = end - start
+    random_int = int.from_bytes(generate_random_bytes(20), byteorder="big")
+    number = (random_int % delta) + start
+    return number
+
+def random_choice(items):
+    index = generate_int(end=len(items))
+    return items[index]
 
 def generate_secret_key(length=128):
     random = generate_random_bytes(length)
