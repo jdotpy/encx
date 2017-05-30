@@ -283,8 +283,11 @@ PRIVATE_DIR_MODE = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR  # This is 0o700 i
 def make_private_dir(path):
     os.makedirs(path, mode=PRIVATE_DIR_MODE, exist_ok=False)
 
-def write_private_path(path, contents):
+def write_private_path(path, contents, mode='w', makedirs=True):
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL  # Refer to "man 2 open".
+    if makedirs:
+        directory = os.path.dirname(path)
+        make_private_dir(directory)
 
     # For security, remove file with potentially elevated mode
     try:
@@ -300,14 +303,19 @@ def write_private_path(path, contents):
         os.umask(umask_original)
 
     # Open file handle and write to file
-    with os.fdopen(descriptor, 'w') as file_writer:
+    with os.fdopen(descriptor, mode) as file_writer:
         file_writer.write(contents)
 
 def read_private_path(path, open_mode='r'):
     """
-        There is still a race condition here that I'm not sure I can get rid of.
-        This is a best-effort design and better than not checking at all.
+        Technically there is a race condition here between
+        when im checking the mode and when I'm opening the file
+        that I'm not sure I can get rid of. But it is private
+        at the time of checking it, presumably it would require
+        the authorization of the user to change it before being
+        read.
     """
+    path = os.path.expanduser(path)
     file_mode = stat.S_IMODE(os.stat(path).st_mode)
     link_mode = stat.S_IMODE(os.lstat(path).st_mode)
     if file_mode != PRIVATE_FILE_MODE or link_mode != PRIVATE_FILE_MODE: 

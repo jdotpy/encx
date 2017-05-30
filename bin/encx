@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from encxlib.client import EncxClient
+from encxlib.cli import EncxClient
 
 import argparse
 import sys
@@ -13,8 +13,8 @@ def global_parser():
 
 def main():
     global_args, remaining_args = global_parser()
-    client = EncxClient()
-    client.command(remaining_args)
+    client = EncxClient(config_path=global_args.config)
+    client.run_command(remaining_args)
 
 if __name__ == '__main__':
     main()

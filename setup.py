@@ -16,8 +16,6 @@ setup(
         'cryptography'
     ],
     scripts=[
-        'bin/encrypt.py',
-        'bin/decrypt.py',
-        'bin/keygen.py',
+        'bin/encx',
     ],
 )

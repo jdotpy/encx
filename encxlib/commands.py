@@ -3,16 +3,71 @@ from .schemes import DEFAULT_SCHEME, get_scheme, schemes
 from .spec import ENCX
 from . import security
 
+from getpass import getpass
 from uuid import uuid4
 import string
 import sys
 import io
 
 class BasePlugin():
-    pass
+    def __init__(self, client):
+        self.client = client
 
-class CoreOperations(BasePlugin):
-    name = 'core'
+    def get_config(self, local=True):
+        global_config = self.client.get_config()
+        if local:
+            return global_config.get(self.name, {})
+        else:
+            return global_config
+
+    def set_config(self, new_configuration, local=True):
+        if local:
+            config = self.client.get_config()
+            config[self.name] = new_configuration
+            self.client.set_config(config)
+        else:
+            config = new_configuration
+            self.client.set_config(config)
+        return config
+
+class PluginManagement(BasePlugin):
+    name = 'plugins'
+    commands = {
+        'plugin:install': {
+            'parser': 'parse_install',
+            'run': 'install',
+            'help': 'Install a plugin',
+        },
+        'plugin:list': {
+            'run': 'list_plugins',
+            'help': 'Show plugins',
+        },
+        'plugin:uninstall': {
+            'parser': 'parse_uninstall',
+            'run': 'uninstall',
+            'help': 'Uninstall a plugin',
+        },
+    }
+
+    def parse_install(self, parser):
+        parser.add_argument('path', nargs=1, help='Python path to plugin class (e.g. my_module.MyPlugin)')
+
+    def install(self, args):
+        pass 
+
+    def parse_uninstall(self, parser):
+        parser.add_argument('path', nargs=1, help='Name of plugin to remove')
+
+    def uninstall(self, args):
+        pass 
+
+    def list_plugins(self, args):
+        for plugin_name,  in self.client.plugins:
+            print(' {} :: ')
+        pass
+
+class Encryption(BasePlugin):
+    name = 'encryption'
     commands = {
         'encrypt': {
             'parser': 'parse_encrypt',
@@ -29,7 +84,7 @@ class CoreOperations(BasePlugin):
     def parse_encrypt(self, parser):
         parser.add_argument('source', nargs="?", help='A file source')
         parser.add_argument('-s', '--scheme', dest='scheme', help='Scheme to use to encrypt', default=DEFAULT_SCHEME.name)
-        parser.add_argument('-k', '--key', dest='key', help='Key to use to decrypt', default=None)
+        parser.add_argument('-k', '--key', dest='key', help='Key for encryption', default=None)
 
     def parse_decrypt(self, parser):
         parser.add_argument('source', nargs="?", help='A file source')
@@ -174,22 +229,22 @@ class Keygen(BasePlugin):
         print(''.join(selections))
 
     def generate_rsa_key(self, args):
-        rsa_key = RSA.generate(args.size)
+        rsa = security.RSA(security.RSA.generate_key())
 
         if args.askpass:
             passphrase = getpass('Enter passphrase for new key:')
         else:
             passphrase = args.passphrase
         
-        private_key = rsa_key.exportKey('PEM', passphrase=passphrase)
+        private_key = rsa.get_private_key(passphrase=passphrase)
         
         if args.public:
-            rsa_pub = rsa_key.publickey()
+            rsa_pub = rsa.get_public_key()
             with open(args.public, 'wb') as pub_file:
-                pub_file.write(rsa_pub.exportKey('PEM'))
+                pub_file.write(rsa_pub)
 
         if args.key:
             with open(args.key, 'wb') as priv_file:
                 priv_file.write(private_key)
         else:
-            print(private_key.decode('utf-8'))
+            print(private_key)
