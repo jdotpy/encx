@@ -31,13 +31,12 @@ class EncxClient():
     base_plugins = [
         'encxlib.commands.PluginManagement',
         'encxlib.commands.Encryption',
-        'encxlib.commands.Keygen',
     ]
 
     def __init__(self, config_path=None):
         self.config_path = config_path
         self._load_configuration()
-        self.plugins = self._load_plugins()
+        self._load_plugins()
         self.parser = self._build_cli()
 
     def _load_configuration(self):
@@ -53,6 +52,7 @@ class EncxClient():
         try:
             contents = security.read_private_path(path)
         except FileNotFoundError as e:
+            print(e)
             if self.config_path:
                 # They specified this file explicitly, continue freaking out
                 raise e
@@ -61,6 +61,8 @@ class EncxClient():
                 # assume they haven't created it
                 self._config = {}
         else:
+            # We loaded the file, set the config_path
+            self.config_path = path
             self._config = yaml.load(contents)
         return self._config
 
@@ -71,23 +73,24 @@ class EncxClient():
             if create_config in 'no':
                 return False
         dumped_config = yaml.dump(self._config)
-        write_private_path(path, dumped_config)
-
-
+        security.write_private_path(path, dumped_config)
 
     def _load_plugins(self):
-        plugins = OrderedDict()
+        self.plugins = OrderedDict()
+        self.plugins_by_name = OrderedDict()
+
         # Start with the base plugins
         plugin_paths = self.base_plugins.copy()
-        plugin_paths.extend(self.get_config().get('plugins', []))
+        plugin_paths.extend(self.get_config().get('installed_plugins', []))
         for path in plugin_paths:
             success, result = self.load_plugin(path)
             if not success:
                 logging.error('Failed to load plugin {}:'.format(path))
                 logging.error(str(result))
                 continue
-            plugins[result.name] = result(self)
-        return plugins
+            plugin = result(self)
+            self.plugins[path] = plugin
+            self.plugins_by_name[result.name] = plugin
 
     def _build_cli(self):
         self.parser = CustomArgParser(description='encx :: An encryption tool')
@@ -100,6 +103,7 @@ class EncxClient():
         ## Pull in all commands from plugins
         subparsers = self.parser.add_subparsers(dest='cmd', parser_class=CustomArgParser)
         subparsers.required = True
+
         self.commands = {}
         for plugin_name, plugin in self.plugins.items():
             for command, cmd_options in plugin.commands.items():
@@ -138,13 +142,17 @@ class EncxClient():
 
     ### Plugin API ###
     def load_plugin(self, path):
-        #TODO: Validation
+        if path in self.plugins:
+            return False, 'Specified plugin is already installed'
         try:
             Plugin = import_class(path)
-        except ImportError as e:
+        except (ImportError, ValueError) as e:
             return False, e
         if not issubclass(Plugin, BasePlugin):
+
             return False, 'Specified plugin is not a subclass of the encxlib.commands.BasePlugin'
+        if Plugin.name in self.plugins_by_name:
+            return False, 'Specified plugin name "{}" is already taken'.format(plugin.name)
         return True, Plugin
 
     def get_config(self):

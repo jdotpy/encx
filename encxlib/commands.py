@@ -5,6 +5,7 @@ from . import security
 
 from getpass import getpass
 from uuid import uuid4
+import logging
 import string
 import sys
 import io
@@ -16,14 +17,16 @@ class BasePlugin():
     def get_config(self, local=True):
         global_config = self.client.get_config()
         if local:
-            return global_config.get(self.name, {})
+            return global_config.get('config', {}).get(self.name, {})
         else:
             return global_config
 
     def set_config(self, new_configuration, local=True):
         if local:
             config = self.client.get_config()
-            config[self.name] = new_configuration
+            if not config.get('plugins', None):
+                config['plugins'] = {}
+            config['plugins'][self.name] = new_configuration
             self.client.set_config(config)
         else:
             config = new_configuration
@@ -31,7 +34,7 @@ class BasePlugin():
         return config
 
 class PluginManagement(BasePlugin):
-    name = 'plugins'
+    name = 'plugin_management'
     commands = {
         'plugin:install': {
             'parser': 'parse_install',
@@ -49,22 +52,65 @@ class PluginManagement(BasePlugin):
         },
     }
 
+    def _installed_plugin_list(self):
+        config = self.get_config(local=False)
+        installed_plugins = config.get('installed_plugins', [])
+        return installed_plugins
+
     def parse_install(self, parser):
         parser.add_argument('path', nargs=1, help='Python path to plugin class (e.g. my_module.MyPlugin)')
+        parser.add_argument('-f', '--force', help='Uninstall without attempting to load')
 
     def install(self, args):
-        pass 
+        plugin_to_install = args.path.pop()
+        if not args.force:
+            success, result = self.client.load_plugin(plugin_to_install)
+            if not success:
+                logging.error('Failed to load plugin {}:'.format(plugin_to_install))
+                logging.error(str(result))
+                return False
+            print('Installing plugin {} ({})'.format(result.name, plugin_to_install))
+        else:
+            print('Installing plugin {}'.format(result.name))
+
+
+        installed_plugins = self._installed_plugin_list()
+        installed_plugins.append(plugin_to_install)
+
+        config = self.get_config(local=False)
+        config['installed_plugins'] = installed_plugins
+        self.set_config(config, local=False)
+        print('Done')
 
     def parse_uninstall(self, parser):
-        parser.add_argument('path', nargs=1, help='Name of plugin to remove')
+        parser.add_argument('name', nargs=1, help='Name of plugin to remove')
 
     def uninstall(self, args):
-        pass 
+        plugin_to_remove = args.name.pop()
+        print('Uninstalling plugin {}'.format(plugin_to_remove))
+        for plugin_path, plugin in self.client.plugins.items():
+            if plugin.name == plugin_to_remove:
+                if plugin_path in self.client.base_plugins:
+                    print('\tPlugin is a core plugin and cannot be uninstalled!')
+                    return False
+
+                # Do removal
+                installed_plugins = self._installed_plugin_list()
+                installed_plugins.remove(plugin_path)
+                config = self.get_config(local=False)
+                config['installed_plugins'] = installed_plugins
+                self.set_config(config, local=False)
+                return True
+
+        print('Plugin not found!')
+        return False
 
     def list_plugins(self, args):
-        for plugin_name,  in self.client.plugins:
-            print(' {} :: ')
-        pass
+        for plugin_path, plugin in self.client.plugins.items():
+            print('{} :: {}'.format(plugin.name, plugin_path))
+            for cmd, cmd_info in plugin.commands.items():
+                print('\t{}: {}'.format(cmd, cmd_info.get('help', 'No documentation available')))
+            print('\n')
 
 class Encryption(BasePlugin):
     name = 'encryption'

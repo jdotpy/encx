@@ -284,10 +284,14 @@ def make_private_dir(path):
     os.makedirs(path, mode=PRIVATE_DIR_MODE, exist_ok=False)
 
 def write_private_path(path, contents, mode='w', makedirs=True):
+    path = os.path.expanduser(path)
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL  # Refer to "man 2 open".
     if makedirs:
         directory = os.path.dirname(path)
-        make_private_dir(directory)
+        try:
+            make_private_dir(directory)
+        except FileExistsError:
+            pass
 
     # For security, remove file with potentially elevated mode
     try:
