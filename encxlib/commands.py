@@ -1,4 +1,3 @@
-from .utils import read_data
 from .schemes import DEFAULT_SCHEME, get_scheme, schemes
 from .spec import ENCX
 from . import security
@@ -8,9 +7,13 @@ from uuid import uuid4
 import logging
 import string
 import sys
+import os
 import io
 
 class BasePlugin():
+    file_loaders = {}
+    commands = {}
+
     def __init__(self, client):
         self.client = client
 
@@ -32,6 +35,18 @@ class BasePlugin():
             config = new_configuration
             self.client.set_config(config)
         return config
+
+class SimpleFileLoaders(BasePlugin):
+    name = 'simple_file_loaders'
+    file_loaders = {
+        '': 'loader', # We want to match everything as a fallback
+    }
+
+    def loader(self, path):
+        if not path or path == '-':
+            return sys.stdin.buffer
+        f = open(os.path.expanduser(path), 'rb')
+        return f
 
 class PluginManagement(BasePlugin):
     name = 'plugin_management'
@@ -115,22 +130,35 @@ class PluginManagement(BasePlugin):
 class Encryption(BasePlugin):
     name = 'encryption'
     commands = {
+        'set_default_key': {
+            'parser': 'parse_set_default_key',
+            'run': 'set_default_key',
+            'help': 'Set an RSA private key as your default key path',
+        },
         'encrypt': {
             'parser': 'parse_encrypt',
             'run': 'encrypt',
-            'help': 'Encrypt into encx format.'
+            'help': 'Encrypt into encx format.',
         },
         'decrypt': {
             'parser': 'parse_decrypt',
             'run': 'decrypt',
-            'help': 'Decrypt from encx format.'
+            'help': 'Decrypt from encx format.',
         },
     }
 
-    def parse_encrypt(self, parser):
-        parser.add_argument('source', nargs="?", help='A file source')
-        parser.add_argument('-s', '--scheme', dest='scheme', help='Scheme to use to encrypt', default=DEFAULT_SCHEME.name)
-        parser.add_argument('-k', '--key', dest='key', help='Key for encryption', default=None)
+    def parse_set_default_key(self, parser):
+        parser.add_argument('key', nargs="?", help='RSA private key')
+
+    def set_default_key(self, args):
+        config = self.get_config(local=False)
+        if args.key:
+            print('Setting default key to {}'.format(args.key))
+            config['default_key_path'] = args.key
+        else:
+            print('Clearing default key')
+            config.pop('default_key_path', None)
+        self.set_config(config, local=False)
 
     def parse_decrypt(self, parser):
         parser.add_argument('source', nargs="?", help='A file source')
@@ -138,22 +166,22 @@ class Encryption(BasePlugin):
         parser.add_argument('-d', '--decode', dest='decode', action='store_true', help='Decode data')
 
     def decrypt(self, args):
-        source_data = read_data(args.source)
-        encx_file = ENCX.from_file(io.BytesIO(source_data))
-        Scheme = get_scheme(encx_file.metadata)
-        scheme = Scheme(key=args.key)
-
-        decrypted_data = scheme.decrypt(encx_file.payload.read(), encx_file.metadata)
+        data, metadata = self.client.decrypt_file(args.source, args.key)
         if args.decode:
-            print(decrypted_data.decode('utf-8'))
+            print(data.decode('utf-8'))
         else:
-            sys.stdout.buffer.write(decrypted_data)
+            sys.stdout.buffer.write(data)
+
+    def parse_encrypt(self, parser):
+        parser.add_argument('source', nargs="?", help='A file source')
+        parser.add_argument('-s', '--scheme', dest='scheme', help='Scheme to use to encrypt', default=DEFAULT_SCHEME.name)
+        parser.add_argument('-k', '--key', dest='key', help='Key for encryption', default=None)
 
     def encrypt(self, args):
-        source_data = read_data(args.source)
+        source_data = self.client.load_file(args.source).read()
         scheme = schemes.get(args.scheme)
-        output = self._create_file(payload=source_data, Scheme=scheme, key=args.key)
-        output.seek(0)
+        key = args.key or self.client.default_rsa_key()
+        output = self._create_file(payload=source_data, Scheme=scheme, key=key)
         sys.stdout.buffer.write(output.read())
 
     def _create_file(self, payload=None, Scheme=DEFAULT_SCHEME, file_obj=None, key=None):
@@ -162,7 +190,9 @@ class Encryption(BasePlugin):
         scheme = Scheme(key=key)
         encrypted_payload, metadata = scheme.encrypt(payload)
         encx_file = ENCX(metadata, io.BytesIO(encrypted_payload))
-        return encx_file.to_file(file_obj)
+        encx_file.to_file(file_obj)
+        file_obj.seek(0)
+        return file_obj
 
     def _read_file(file_obj, key=None):
         encx_file = ENCX.from_file(file_obj)

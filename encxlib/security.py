@@ -20,12 +20,12 @@ class SecurityError(ValueError):
 
 def load_rsa_key(source, path=True, passphrase=None):
     if path:
-        key_contents = read_private_path(path)
+        key_contents = read_private_path(source)
     else:
         key_contents = source
     if 'ENCRYPTED' in key_contents:
         if passphrase is None:
-            passphrase = getpass('Enter the passphrase for "{}": '.format(path))
+            passphrase = getpass('Enter the passphrase for "{}": '.format(source))
     
     return RSA(key_contents, passphrase).get_private_key()
 

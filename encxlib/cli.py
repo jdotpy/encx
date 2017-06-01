@@ -1,13 +1,17 @@
 import yaml
 
 from . import security
+from .spec import ENCX
+from .schemes import get_scheme
 
 from importlib import import_module
 from collections import OrderedDict
 from .commands import BasePlugin
+from pprint import pprint
 import logging
 import argparse
 import sys
+import re
 
 
 class CustomArgParser(argparse.ArgumentParser):
@@ -27,10 +31,12 @@ def import_class(path):
 class EncxClient():
     """ Implements the core of the CLI. Extendable with plugins """
 
-    default_config_path = '~/encx/encx.conf'
+    default_config_path = '~/encx/encx.yaml'
     base_plugins = [
+        'encxlib.commands.SimpleFileLoaders',
         'encxlib.commands.PluginManagement',
         'encxlib.commands.Encryption',
+        'encxlib.commands.Keygen',
     ]
 
     def __init__(self, config_path=None):
@@ -52,7 +58,6 @@ class EncxClient():
         try:
             contents = security.read_private_path(path)
         except FileNotFoundError as e:
-            print(e)
             if self.config_path:
                 # They specified this file explicitly, continue freaking out
                 raise e
@@ -89,6 +94,8 @@ class EncxClient():
                 logging.error(str(result))
                 continue
             plugin = result(self)
+
+            # Add to client mappings
             self.plugins[path] = plugin
             self.plugins_by_name[result.name] = plugin
 
@@ -99,12 +106,18 @@ class EncxClient():
         # message
         self.parser.add_argument('-c', '--config', help="Path to configuration file")
 
-        ##############
-        ## Pull in all commands from plugins
+        #############
+        ## Commands not in plugins
         subparsers = self.parser.add_subparsers(dest='cmd', parser_class=CustomArgParser)
         subparsers.required = True
 
-        self.commands = {}
+        self.commands = {
+            'config': self.cmd_show_config
+        }
+        subparser = subparsers.add_parser('config', help='View configuration')
+
+        ##############
+        ## Pull in all commands from plugins
         for plugin_name, plugin in self.plugins.items():
             for command, cmd_options in plugin.commands.items():
                 cmd_help = cmd_options.get('help', None)
@@ -126,9 +139,12 @@ class EncxClient():
         if self._config_changed:
             self._save_configuration()
 
+    ###################
+    ### Basic commands
+    def cmd_show_config(self, args):
+        print(yaml.dump(self.get_config()))
 
     ### Entry Point ###
-
     def run_command(self, source):
         args = self.parser.parse_args(source)
         command = args.cmd
@@ -161,4 +177,30 @@ class EncxClient():
     def set_config(self, new_config):
         self._config = new_config
         self._config_changed = True
+
+    def default_rsa_key(self):
+        return self.get_config().get('default_key_path', None)
+
+    def load_file(self, path):
+        for plugin in self.plugins.values():
+            for pattern, loader_name in plugin.file_loaders.items():
+                loader = getattr(plugin, loader_name)
+                if re.match(pattern, path):
+                    try:
+                        return loader(path)
+                    except FileNotFoundError:
+                        continue
+        raise FileNotFoundError('Could not find file: {}'.format(path))
+
+    def decrypt_file(self, path, key=None):
+        if key is None:
+            key = self.default_rsa_key()
+
+        source = self.load_file(path)
+        encx_file = ENCX.from_file(source)
+        Scheme = get_scheme(encx_file.metadata)
+        scheme = Scheme(key=key)
+        payload = scheme.decrypt(encx_file.payload.read(), encx_file.metadata)
+        return payload, encx_file.metadata
+
 

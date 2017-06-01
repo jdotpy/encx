@@ -29,7 +29,7 @@ class BaseScheme():
         if self.key_type == self.KEY_TYPE_RSA:
             try:
                 return security.load_rsa_key(key, path=False)
-            except ValueError:
+            except ValueError as e:
                 return security.load_rsa_key(key)
         else:
             return key
