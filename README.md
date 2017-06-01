@@ -9,33 +9,33 @@ CLI providing file encryption capability using the encx file format.
 	## Encrypt+Decrypt operations ##
 
 	# AES 
-	encrypt.py cleartext.txt -s AES -k "Rvq/bDuo6w60EsCobBqpfg==" > encrypted_file.txt
-	decrypt.py encrypted_file.txt -k "Rvq/bDuo6w60EsCobBqpfg==" > decrypted-file.txt
+	encx encrypt cleartext.txt -s AES -k "Rvq/bDuo6w60EsCobBqpfg==" > encrypted_file.txt.encx
+	encx decrypt encrypted_file.txt.encx -k "Rvq/bDuo6w60EsCobBqpfg==" > decrypted-file.txt
 
 	# RSA-AES (RSA encrypted AES key packaged with data)
-	encrypt.py cleartext.txt -s RSA-AES -k ~/.ssh/id_rsa > encrypted_file.txt
-	decrypt.py encrypted_file.txt -k ~/.ssh/id_rsa > decrypted-file.txt
+	encx encrypt cleartext.txt -s RSA-AES -k ~/.ssh/id_rsa > encrypted_file.txt
+	encx decrypt encrypted_file.txt -k ~/.ssh/id_rsa > decrypted-file.txt
 
 	## Key Generation ##
 
 	# RSA Pem format
-	keygen.py rsa -s 2048 > my_file.pem 
-	keygen.py rsa -s 2048 -k my_file.pem -p my_public_key.pub
+	encx keygen rsa -s 2048 > my_file.pem 
+	encx keygen rsa -s 2048 -k my_file.pem -p my_public_key.pub
 
 	# AES-ready key
-	$ keygen.py key
+	$ encx keygen key
 	PJPKMG59Ai6uQfgDTbGs1w==
 
 	# Strings/passwords
-	$ keygen.py string 
+	$ encx keygen string 
 	LTXgUHLWGJQnsBFhiitk
-	$ keygen.py string --source "1234567890abcdef" -l 4
-	980e4ebc9e4aa594a25f
-	$ keygen.py string -s "[]{}" -l 4
+	$ encx keygen string --source "1234567890abcdef" -l 4
+	980e4
+	$ encx keygen string -s "[]{}" -l 4
 	{[]]
 
 	# UUIDs
-	$ keygen.py uuid
+	$ encx keygen uuid
 	7a8f6755-f4f8-ac40-7962-c0df9c9a4b64
 
 
