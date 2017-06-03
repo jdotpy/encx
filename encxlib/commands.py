@@ -2,16 +2,20 @@ from .schemes import DEFAULT_SCHEME, get_scheme, schemes
 from .spec import ENCX
 from . import security
 
+import yaml
+
 from getpass import getpass
 from uuid import uuid4
 import logging
 import string
+import json
 import sys
 import os
 import io
 
 class BasePlugin():
     file_loaders = {}
+    filetype_validators = {}
     commands = {}
 
     def __init__(self, client):
@@ -39,14 +43,46 @@ class BasePlugin():
 class SimpleFileLoaders(BasePlugin):
     name = 'simple_file_loaders'
     file_loaders = {
-        '': 'loader', # We want to match everything as a fallback
+        '.*': {
+            'loader': 'load', # We want to match everything as a fallback
+            'writer': 'write', # We want to match everything as a fallback
+        }
+    }
+    filetype_validators = {
+        'json': 'json_validator',
+        'yaml': 'yaml_validator',
+        'yml': 'yaml_validator',
     }
 
-    def loader(self, path):
+    def json_validator(self, data):
+        try:
+            deserialized = json.loads(data.decode('utf-8'))
+            return True, 'Everything looks good!'
+        except Exception as e:
+            return False, 'Invalid JSON:' + str(e)
+
+    def yaml_validator(self, data):
+        try:
+            deserialized = yaml.load(data.decode('utf-8'))
+            return True, 'Everything looks good!'
+        except Exception as e:
+            return False, 'Invalid YAML:' + str(e)
+
+    def load(self, path):
         if not path or path == '-':
-            return sys.stdin.buffer
-        f = open(os.path.expanduser(path), 'rb')
-        return f
+            return sys.stdin.buffer.read()
+        with open(os.path.expanduser(path), 'rb') as f:
+            content = f.read()
+        return content
+
+    def write(self, path, data, overwrite=False):
+        if path == '-':
+            sys.stdout.buffer.write(data)
+            return True
+        if not overwrite and os.path.exists(path):
+            raise FileExistsError()
+        with open(os.path.expanduser(path), 'wb') as f:
+            f.write(data)
 
 class PluginManagement(BasePlugin):
     name = 'plugin_management'
@@ -74,7 +110,7 @@ class PluginManagement(BasePlugin):
 
     def parse_install(self, parser):
         parser.add_argument('path', nargs=1, help='Python path to plugin class (e.g. my_module.MyPlugin)')
-        parser.add_argument('-f', '--force', help='Uninstall without attempting to load')
+        parser.add_argument('-f', '--force', action='store_true', help='Uninstall without attempting to load')
 
     def install(self, args):
         plugin_to_install = args.path.pop()
@@ -145,6 +181,11 @@ class Encryption(BasePlugin):
             'run': 'decrypt',
             'help': 'Decrypt from encx format.',
         },
+        'edit': {
+            'parser': 'parse_edit',
+            'run': 'edit',
+            'help': 'Edit a file in encx format. (uses a plaintext tmp file)',
+        },
     }
 
     def parse_set_default_key(self, parser):
@@ -173,37 +214,78 @@ class Encryption(BasePlugin):
             sys.stdout.buffer.write(data)
 
     def parse_encrypt(self, parser):
-        parser.add_argument('source', nargs="?", help='A file source')
+        parser.add_argument('source', nargs="?", default='-', help='A file source')
         parser.add_argument('-s', '--scheme', dest='scheme', help='Scheme to use to encrypt', default=DEFAULT_SCHEME.name)
         parser.add_argument('-k', '--key', dest='key', help='Key for encryption', default=None)
+        parser.add_argument('-t', '--target', default='-', help='Target path for output (default is "-" for stdout')
+        parser.add_argument('-f', '--force', action='store_true', help='Overwrite any existing file')
 
     def encrypt(self, args):
-        source_data = self.client.load_file(args.source).read()
-        scheme = schemes.get(args.scheme)
-        key = args.key or self.client.default_rsa_key()
-        output = self._create_file(payload=source_data, Scheme=scheme, key=key)
-        sys.stdout.buffer.write(output.read())
-
-    def _create_file(self, payload=None, Scheme=DEFAULT_SCHEME, file_obj=None, key=None):
-        if file_obj is None:
-            file_obj = io.BytesIO()
-        scheme = Scheme(key=key)
-        encrypted_payload, metadata = scheme.encrypt(payload)
-        encx_file = ENCX(metadata, io.BytesIO(encrypted_payload))
-        encx_file.to_file(file_obj)
-        file_obj.seek(0)
-        return file_obj
-
-    def _read_file(file_obj, key=None):
-        encx_file = ENCX.from_file(file_obj)
-        scheme_name = encx.metadata.get('scheme', None)
-        if scheme_name not in schemes:
+        source_data = self.client.load_file(args.source)
+        if args.scheme not in schemes:
             print('Scheme not found!')
             sys.exit(1)
-        scheme = schemes[scheme_name](metadata, key=key)
-        encrypted_payload = scheme.encrypt(payload)
-        encx_file = ENCX(metadata, payload)
-        return encx_file.to_file(file_obj)
+        scheme = schemes.get(args.scheme)
+        self.client.encrypt_file(
+            args.target,
+            source_data,
+            scheme=scheme,
+            key=args.key,
+            overwrite=args.force,
+        )
+
+    def parse_edit(self, parser):
+        parser.add_argument('source', nargs="?", help='A file source')
+        parser.add_argument('-i', '--initialize',
+            action='store_true',
+            help='Start a new file, or replace existing.',
+        )
+        parser.add_argument('-f', '--force',
+            action='store_true',
+            help='Okay to overwrite existing file (when initializing)',
+        )
+        parser.add_argument('-s', '--scheme',
+            help='Scheme to use to encrypt',
+            default=DEFAULT_SCHEME.name
+        )
+        parser.add_argument('-k', '--key', help='Key for encryption')
+        parser.add_argument('-r', '--validator', help='Validator to use')
+
+    def edit(self, args):
+        # Load from source
+        if args.initialize:
+            data, metadata = bytes(), {} 
+        else:
+            data, metadata = self.client.decrypt_file(args.source, args.key)
+
+        # Do edit funtionality
+        validator_name, validator = self.client.get_filetype_validator(
+            args.validator,
+            path=args.source,
+        )
+        success, result = self.client.edit_data(
+            data,
+            validator=validator,
+            extension=validator_name
+        )
+
+        if not success:
+            print('Edit failed, no modifications to {} were made'.format(args.source))
+            return success
+
+        # Ok write back out to source
+        scheme = schemes.get(args.scheme)
+        if args.initialize:
+            overwrite = bool(args.force) # When initializing you need that extra check
+        else:
+            overwrite = True # Always overwrite when editing
+        self.client.encrypt_file(
+            args.source,
+            result,
+            scheme=scheme,
+            key=args.key,
+            overwrite=overwrite,
+        )
 
 class Keygen(BasePlugin):
     name = 'keygen'

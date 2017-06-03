@@ -283,6 +283,13 @@ PRIVATE_DIR_MODE = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR  # This is 0o700 i
 def make_private_dir(path):
     os.makedirs(path, mode=PRIVATE_DIR_MODE, exist_ok=False)
 
+def remove_path(path, is_dir=False):
+    path = os.path.expanduser(path)
+    if is_dir:
+        shutil.rmtree(path)
+    else:
+        os.remove(path)
+
 def write_private_path(path, contents, mode='w', makedirs=True):
     path = os.path.expanduser(path)
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL  # Refer to "man 2 open".
@@ -295,7 +302,7 @@ def write_private_path(path, contents, mode='w', makedirs=True):
 
     # For security, remove file with potentially elevated mode
     try:
-        os.remove(path)
+        remove_path(path)
     except OSError:
         pass
 

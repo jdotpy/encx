@@ -2,17 +2,23 @@ import yaml
 
 from . import security
 from .spec import ENCX
-from .schemes import get_scheme
+from .schemes import get_scheme, DEFAULT_SCHEME
 
 from importlib import import_module
 from collections import OrderedDict
 from .commands import BasePlugin
 from pprint import pprint
+import subprocess
 import logging
 import argparse
+import time
 import sys
+import io
+import os
 import re
 
+class FileLoaderInvalidPath(ValueError):
+    pass
 
 class CustomArgParser(argparse.ArgumentParser):
     def error(self, message):
@@ -181,26 +187,149 @@ class EncxClient():
     def default_rsa_key(self):
         return self.get_config().get('default_key_path', None)
 
+    def get_tmp_dir(self):
+        if self.config_path:
+            return os.path.dirname(self.config_path)
+        else:
+            return os.path.abspath('.')
+
     def load_file(self, path):
-        for plugin in self.plugins.values():
-            for pattern, loader_name in plugin.file_loaders.items():
-                loader = getattr(plugin, loader_name)
+        if path is None:
+            path = ''
+        plugin_list = list(self.plugins.values())
+        for plugin in plugin_list[::-1]: # Reverse
+            for pattern, loader in plugin.file_loaders.items():
+                loader = getattr(plugin, loader['loader'])
                 if re.match(pattern, path):
                     try:
                         return loader(path)
-                    except FileNotFoundError:
+                    except (FileNotFoundError, FileLoaderInvalidPath) as e:
                         continue
         raise FileNotFoundError('Could not find file: {}'.format(path))
+
+    def write_file(self, path, data, overwrite=False):
+        plugin_list = list(self.plugins.values())
+        for plugin in plugin_list[::-1]: # Reverse
+            for pattern, loader in plugin.file_loaders.items():
+                writer = getattr(plugin, loader['writer'])
+                if re.match(pattern, path):
+                    try:
+                        return writer(path, data, overwrite=overwrite)
+                    except (FileLoaderInvalidPath) as e:
+                        continue
+        raise ValueError('Could not find a writer for file: {}'.format(path))
 
     def decrypt_file(self, path, key=None):
         if key is None:
             key = self.default_rsa_key()
 
         source = self.load_file(path)
-        encx_file = ENCX.from_file(source)
+        encx_file = ENCX.from_file(io.BytesIO(source))
         Scheme = get_scheme(encx_file.metadata)
         scheme = Scheme(key=key)
         payload = scheme.decrypt(encx_file.payload.read(), encx_file.metadata)
         return payload, encx_file.metadata
 
+    def encrypt_file(self, path, data, scheme=DEFAULT_SCHEME, key=None, overwrite=False):
+        if key is None:
+            key = self.default_rsa_key()
+
+        scheme_instance = scheme(key=key)
+        encrypted_payload, metadata = scheme_instance.encrypt(data)
+        encx_file = ENCX(metadata, io.BytesIO(encrypted_payload))
+        output_stream = encx_file.to_file(io.BytesIO())
+        output_stream.seek(0)
+        return self.write_file(path, output_stream.read(), overwrite=overwrite)
+
+    def get_filetype_validator(self, name, path=None):
+        if not name and not path:
+            return None, None
+        elif not name:
+            # Exclude the encx extension
+            parts = path.split('.')
+            if parts[-1] == 'encx':
+                parts.pop()
+            
+            # We didnt have a valid extension
+            if len(parts) == 1:
+                return None, None
+            name = parts[-1].lower()
+
+        validator = None
+        plugin_list = list(self.plugins.values())
+        for plugin in plugin_list[::-1]: # Reverse
+            validator_attr = plugin.filetype_validators.get(name, None)
+            if validator_attr:
+                validator = getattr(plugin, validator_attr)
+                break
+        return name, validator
+
+    def edit_data(self, data, extension=None, validator=None, timeout=None):
+        """
+            Create a temporary file to edit the content.  If a valiator
+            is given then content is not returned until it passes the validator.
+
+            Polling is used to check for changes to the tmp file which isnt
+            ideal but its a minimal delay and is an easy cross-platform check
+            that doesn't require a big dependency.
+        """
+        poll_time = 1
+        error_view_time = 2
+        success = False
+        new_data = None
+        if extension is None:
+            extension = 'encx-tmp'
+        tmp_path = os.path.join(
+            self.get_tmp_dir(),
+            '{}.{}'.format(security.generate_uuid(), extension),
+        )
+        tmp_path = os.path.expanduser(tmp_path)
+        security.write_private_path(tmp_path, data, mode='wb')
+        creation_time = os.path.getmtime(tmp_path)
+
+        while not success:
+            try:
+                # Launch editor
+                subprocess.call(["vim", "-n", tmp_path])
+
+                # Poll FS for change
+                if timeout:
+                    expire = time.time() + timeout
+                else:
+                    expire = sys.maxsize # Arbitrarily large number that won't be reached
+                modified = False
+                print('Waiting for changes to tmp file...(Ctrl + C to cancel)')
+                while time.time() < expire:
+                    modified_time = os.path.getmtime(tmp_path)
+                    if modified_time > creation_time:
+                        modified = True
+                        break
+                    time.sleep(poll_time)
+
+                if not modified:
+                    logging.error('Edit timed out! Going to clean up')
+                    break
+
+                new_data = security.read_private_path(tmp_path, 'rb')
+                if validator:
+                    passes, message = validator(new_data)
+                    if not passes:
+                        logging.error(message)
+                        time.sleep(error_view_time)
+                        continue # Restart editor, try again
+                    else:
+                        success = True
+                else:
+                    success = True
+
+            except KeyboardInterrupt as e:
+                logging.error('Cancelling file edit')
+                break
+            except Exception as e:
+                logging.error('Failed to edit file!')
+                logging.error(str(e))
+                break
+
+        security.remove_path(tmp_path)
+        return success, new_data;
 
