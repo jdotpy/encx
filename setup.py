@@ -13,7 +13,8 @@ setup(
         'encxlib',
     ],
     install_requires=[
-        'cryptography'
+        'cryptography',
+        'pyyaml',
     ],
     scripts=[
         'bin/encx',
