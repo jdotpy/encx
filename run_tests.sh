@@ -1,1 +1,1 @@
-python -m unittest encxlib.tests
+/usr/bin/env python -m unittest encxlib.tests

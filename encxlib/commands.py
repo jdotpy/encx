@@ -54,17 +54,19 @@ class SimpleFileLoaders(BasePlugin):
         'yml': 'yaml_validator',
     }
 
+    validation_success_message = 'Everything looks good!'
+
     def json_validator(self, data):
         try:
             deserialized = json.loads(data.decode('utf-8'))
-            return True, 'Everything looks good!'
+            return True, self.validation_success_message
         except Exception as e:
             return False, 'Invalid JSON:' + str(e)
 
     def yaml_validator(self, data):
         try:
             deserialized = yaml.load(data.decode('utf-8'))
-            return True, 'Everything looks good!'
+            return True, self.validation_success_message
         except Exception as e:
             return False, 'Invalid YAML:' + str(e)
 

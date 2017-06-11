@@ -332,4 +332,3 @@ class EncxClient():
 
         security.remove_path(tmp_path)
         return success, new_data;
-

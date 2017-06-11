@@ -1,6 +1,10 @@
 import unittest
 import base64
+import yaml
+import json
+
 import io
+
 
 from .spec import ENCX
 from .security import (
@@ -9,6 +13,7 @@ from .security import (
     AES, RSA
 )
 from .schemes import all_schemes
+from . import commands
 
 class UtilityTests(unittest.TestCase):
     def test_random_bytes(self):
@@ -65,3 +70,62 @@ class FileFormatTest(unittest.TestCase):
 
         assert reloaded.metadata == metadata
         assert reloaded.payload.read() == my_bytes
+
+#################
+### Plugins
+
+def validator_test(case, validator, good=[], bad=[]):
+    for value in good:
+        success, message = validator(value)
+        case.assertTrue(success, msg='Validator "{}" should pass for value "{}" instead received: {}'.format(
+            validator.__name__,
+            value,
+            message,
+        ))
+    for value in bad:
+        success, message = validator(value)
+        case.assertFalse(success, msg='Validator "{}" should fail for value "{}" instead received: {}'.format(
+            validator.__name__,
+            value,
+            message,
+        ))
+
+class SimpleFileLoaderTests(unittest.TestCase):
+    test_data = {'foo': 'bar', 'dataz': 42}
+
+    def fake_client(self):
+        return object()
+
+    def test_validators(self):
+        good_json = json.dumps(self.test_data)
+
+        plugin = commands.SimpleFileLoaders(self.fake_client())
+        validators = plugin.filetype_validators
+
+        self.assertIn('json', validators)
+        self.assertIn('yaml', validators)
+        self.assertIn('yml', validators)
+        self.assertEqual(validators['yaml'], validators['yml'])
+
+
+    def test_json_validator(self):
+        plugin = commands.SimpleFileLoaders(self.fake_client())
+        json_validator = getattr(plugin, plugin.filetype_validators['json'])
+
+        validator_test(
+            self,
+            json_validator,
+            bad=[None, 'not json'.encode('utf-8'), b''],
+            good=[json.dumps(self.test_data).encode('utf-8')],
+        )
+
+    def test_yaml_validator(self):
+        plugin = commands.SimpleFileLoaders(self.fake_client())
+        yaml_validator = getattr(plugin, plugin.filetype_validators['yaml'])
+
+        validator_test(
+            self,
+            yaml_validator,
+            bad=[None, '{not yaml'.encode('utf-8')],
+            good=[yaml.dump(self.test_data).encode('utf-8')],
+        )
