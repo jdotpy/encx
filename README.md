@@ -4,17 +4,52 @@
 
 CLI providing file encryption capability using the encx file format.
 
+**Installation**:
+
+Global Dependencies
+
+* Python3
+
+Linux Dependencies
+
+For linux distributions you'll need to get the python / openssl dependencies:
+
+	# Debian/Ubuntu 
+	sudo apt-get install build-essential libssl-dev libffi-dev python-dev	
+
+	# Fedora/RHEL:
+	sudo yum install gcc libffi-devel python-devel openssl-devel
+
+OSX and Windows should just work:
+	
+	# You might have to prefix with sudo:
+	pip3 install https://github.com/jdotpy/encx/archive/stable.tar.gz
+
+To test installation:
+	
+	encx -h
+
+
 **Basic Usage**: 
 
-	## Encrypt+Decrypt operations ##
+	## Basic Encryption ##
 
-	# AES 
-	encx encrypt cleartext.txt -s AES -k "Rvq/bDuo6w60EsCobBqpfg==" > encrypted_file.txt.encx
-	encx decrypt encrypted_file.txt.encx -k "Rvq/bDuo6w60EsCobBqpfg==" > decrypted-file.txt
+	# Setup your default RSA key for easy encryption
+	# You'll need to replace `id_rsa` with the path to your private key
 
-	# RSA-AES (RSA encrypted AES key packaged with data)
-	encx encrypt cleartext.txt -s RSA-AES -k ~/.ssh/id_rsa > encrypted_file.txt
-	encx decrypt encrypted_file.txt -k ~/.ssh/id_rsa > decrypted-file.txt
+	encx set_default_key ~/.ssh/id_rsa
+
+	# Encrypt a message and send the output to a new .encx file!
+	
+	echo "The crow flies at midnight!" | encx encrypt -t ~/my-secret-message.txt.encx
+
+	# Decrypt it back out
+
+	encx decrypt ~/my-secret-message.txt.encx
+
+	# You can also edit a file (reads, decrypts, opens editor, changes are encrypted and saved back to file)
+
+	encx edit ~/my-secret-message.txt.encx
 
 	## Key Generation ##
 
@@ -37,6 +72,17 @@ CLI providing file encryption capability using the encx file format.
 	# UUIDs
 	$ encx keygen uuid
 	7a8f6755-f4f8-ac40-7962-c0df9c9a4b64
+
+**Advanced Usage**:
+
+I'll be adding a readthedocs site soon, until then just do:
+
+	encx -h
+
+**Plugins**:
+
+* S3 Backend (https://github.com/jdotpy/encx_s3)
+* Template renderer (https://github.com/jdotpy/encx_templates)
 
 
 **Known Issues**: 
