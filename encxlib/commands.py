@@ -24,7 +24,7 @@ class BasePlugin():
     def get_config(self, local=True):
         global_config = self.client.get_config()
         if local:
-            return global_config.get('config', {}).get(self.name, {})
+            return global_config.get('plugins', {}).get(self.name, {})
         else:
             return global_config
 
@@ -39,6 +39,10 @@ class BasePlugin():
             config = new_configuration
             self.client.set_config(config)
         return config
+
+    def finish(self):
+        """ Hook to allow post-operation processing (config-saves, etc) """
+        pass
 
 class SimpleFileLoaders(BasePlugin):
     name = 'simple_file_loaders'

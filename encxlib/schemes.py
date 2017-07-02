@@ -70,7 +70,7 @@ class RSAScheme(BaseScheme):
     def generate_key(cls):
         return security.RSA.generate_key()
 
-    def encrypt(self, payload):
+    def encrypt(self, payload, include_aes_key=False):
         # Start by generating an AES key and encrypting the payload
         aes_encryptor = security.AES()
         aes_ciphertext, aes_metadata = aes_encryptor.encrypt(payload)
@@ -89,7 +89,11 @@ class RSAScheme(BaseScheme):
             'encrypted_key': encrypted_key,
             'note': 'The payload is encrypted with AES, and the key used is encrypted using RSA',
         }
-        return aes_ciphertext, meta 
+        if include_aes_key:
+            return aes_ciphertext, meta, aes_key
+        else:
+            return aes_ciphertext, meta 
+
 
     def decrypt(self, ciphertext, meta):
         rsa_meta = meta.get('rsa', {})

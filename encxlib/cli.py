@@ -37,7 +37,8 @@ def import_class(path):
 class EncxClient():
     """ Implements the core of the CLI. Extendable with plugins """
 
-    default_config_path = '~/encx/encx.yaml'
+    default_config_dir = os.path.expanduser('~/encx')
+    default_config_file = 'encx.yaml'
     base_plugins = [
         'encxlib.commands.SimpleFileLoaders',
         'encxlib.commands.PluginManagement',
@@ -57,7 +58,8 @@ class EncxClient():
         # keep it that way until i can prove that the default config
         # exists. This prevents the default config path from being
         # created unless explicitly asked for by the user.
-        path = self.config_path or self.default_config_path
+        path = self.get_config_file_path()
+
         # This flag will indicate whether we've made any changes and
         # thus whether we need to save out the file
         self._config_changed = False
@@ -65,26 +67,28 @@ class EncxClient():
             contents = security.read_private_path(path)
         except FileNotFoundError as e:
             if self.config_path:
-                # They specified this file explicitly, continue freaking out
-                raise e
-            else:
-                # They didnt specify file and  default doesnt exist
-                # assume they haven't created it
-                self._config = {}
+                # They specified this file explicitly, warn the user
+                logging.warning('Specified config file doesnt exist.')
+            # They didnt specify file and  default doesnt exist
+            # assume they haven't created it
+            self._config = {}
         else:
             # We loaded the file, set the config_path
             self.config_path = path
             self._config = yaml.load(contents)
         return self._config
 
-    def _save_configuration(self):
-        path = self.config_path or self.default_config_path
-        if not self.config_path:
-            create_config = input('Create new config at default location "{}" (yes/no)?'.format(path))
+    def _save_configuration(self, force=False):
+        if not self._config_changed:
+            return False
+        path = self.get_config_file_path()
+        if not os.path.exists(path):
+            create_config = input('Create new config at location "{}" (yes/no)?'.format(path))
             if create_config in 'no':
                 return False
         dumped_config = yaml.dump(self._config)
         security.write_private_path(path, dumped_config)
+        self._config_changed = False # Reset the flag in case this was forced
 
     def _load_plugins(self):
         self.plugins = OrderedDict()
@@ -142,8 +146,11 @@ class EncxClient():
 
     def _finish(self):
         """ This is a hook that i'm using to trigger configuration changes """
-        if self._config_changed:
-            self._save_configuration()
+        self._save_configuration()
+
+        for plugin in self.iterate_plugin_objects():
+            if hasattr(plugin, 'finish'):
+                plugin.finish()
 
     ###################
     ### Basic commands
@@ -163,6 +170,9 @@ class EncxClient():
         self._finish()
 
     ### Plugin API ###
+    def force_config_save(self):
+        self._save_configuration
+
     def load_plugin(self, path):
         if path in self.plugins:
             return False, 'Specified plugin is already installed'
@@ -187,20 +197,40 @@ class EncxClient():
     def default_rsa_key(self):
         return self.get_config().get('default_key_path', None)
 
+    def get_config_file_path(self):
+        if self.config_path:
+            if '.' in self.config_path:
+                path = self.config_path
+            else:
+                path = os.path.join(self.config_path, self.default_config_file)
+        else:
+            path = os.path.join(self.get_config_dir(), self.default_config_file)
+        return path
+
+    def get_config_dir(self):
+        if self.config_path:
+            return os.path.dirname(self.config_path)
+        else:
+            return self.default_config_dir
+
     def get_tmp_dir(self):
         if self.config_path:
             return os.path.dirname(self.config_path)
         else:
             return os.path.abspath('.')
 
+    def iterate_plugin_objects(self):
+        plugin_list = list(self.plugins.values())
+        for plugin in plugin_list[::-1]: # Reverse
+            yield plugin
+
     def load_file(self, path):
         if path is None:
             path = ''
-        plugin_list = list(self.plugins.values())
-        for plugin in plugin_list[::-1]: # Reverse
+        for plugin in self.iterate_plugin_objects():
             for pattern, loader in plugin.file_loaders.items():
-                loader = getattr(plugin, loader['loader'])
                 if re.match(pattern, path):
+                    loader = getattr(plugin, loader['loader'])
                     try:
                         return loader(path)
                     except (FileNotFoundError, FileLoaderInvalidPath) as e:
@@ -208,8 +238,7 @@ class EncxClient():
         raise FileNotFoundError('Could not find file: {}'.format(path))
 
     def write_file(self, path, data, overwrite=False):
-        plugin_list = list(self.plugins.values())
-        for plugin in plugin_list[::-1]: # Reverse
+        for plugin in self.iterate_plugin_objects():
             for pattern, loader in plugin.file_loaders.items():
                 writer = getattr(plugin, loader['writer'])
                 if re.match(pattern, path):
@@ -256,8 +285,7 @@ class EncxClient():
             name = parts[-1].lower()
 
         validator = None
-        plugin_list = list(self.plugins.values())
-        for plugin in plugin_list[::-1]: # Reverse
+        for plugin in self.iterate_plugin_objects():
             validator_attr = plugin.filetype_validators.get(name, None)
             if validator_attr:
                 validator = getattr(plugin, validator_attr)
