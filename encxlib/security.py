@@ -43,7 +43,7 @@ def hasher(data, raw=False):
     if raw:
         return digest
     else:
-        return binascii.hexlify(digest)
+        return binascii.hexlify(digest).decode('utf-8')
 
 def generate_random_bytes(size=64):
     return os.urandom(size)
