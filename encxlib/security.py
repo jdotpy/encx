@@ -7,6 +7,7 @@ from cryptography.exceptions import InvalidSignature
 
 from getpass import getpass
 from uuid import uuid4
+import binascii
 import logging
 import base64
 import stat
@@ -42,7 +43,7 @@ def hasher(data, raw=False):
     if raw:
         return digest
     else:
-        return digest.hex()
+        return binascii.hexlify(digest).decode('utf-8')
 
 def generate_random_bytes(size=64):
     return os.urandom(size)
