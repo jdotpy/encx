@@ -71,6 +71,7 @@ def from_b64_str(string, encoding='utf-8'):
 
 class AES():
     name = 'AES'
+    cipher_name = 'AES::CFB'
     block_size = 16 # In bytes; so 16 is a 128-bit key
     default_key_size = block_size
 
@@ -113,6 +114,7 @@ class AES():
         ciphertext = encryptor.update(payload) + encryptor.finalize()
         metadata = {}
         metadata['cipher'] = self.name
+        metadata['key_size'] = len(self.key) * 8
         metadata['iv'] = to_b64_str(iv)
         metadata['mode'] = 'CFB'
         return ciphertext, metadata
@@ -126,7 +128,7 @@ class AES():
 
 class RSA():
     name = 'RSA'
-    cipher_name = 'PKCS#1 v1.5 OAEP'
+    cipher_name = 'RSAES-OAEP::SHA256'
     default_key_size = 2048
     public_exponent = 65537
 
@@ -134,7 +136,6 @@ class RSA():
         self._private = None
         self._public = None
         self._set_key(key, passphrase=passphrase)
-
 
     @classmethod
     def generate_key(cls, size=None):
@@ -253,8 +254,8 @@ class RSA():
         ciphertext = public_key.encrypt(
             payload,
             padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA1()),
-                algorithm=hashes.SHA1(),
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
                 label=None
             )
         )
@@ -268,8 +269,8 @@ class RSA():
             plaintext = self._get_private_key().decrypt(
                 ciphertext,
                 padding.OAEP(
-                    mgf=padding.MGF1(algorithm=hashes.SHA1()),
-                    algorithm=hashes.SHA1(),
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
                     label=None
                 )
             )
