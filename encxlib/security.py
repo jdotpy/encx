@@ -265,18 +265,15 @@ class RSA():
         metadata['padding'] = 'OAEP'
         return ciphertext, metadata
 
-    def decrypt(self, ciphertext):
-        try:
-            plaintext = self._get_private_key().decrypt(
-                ciphertext,
-                padding.OAEP(
-                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                    algorithm=hashes.SHA256(),
-                    label=None
-                )
+    def decrypt(self, ciphertext, metadata=None):
+        plaintext = self._get_private_key().decrypt(
+            ciphertext,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
             )
-        except ValueError as e:
-            return None
+        )
         return plaintext
 
 PRIVATE_FILE_MODE = stat.S_IRUSR | stat.S_IWUSR  # This is 0o600 in octal

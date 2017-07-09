@@ -354,7 +354,6 @@ class Keygen(BasePlugin):
         )
         rsa_key_gen.set_defaults(func=self.generate_rsa_key)
 
-
         uuid_parser = subparsers.add_parser('uuid', help='Random UUID')
         uuid_parser.set_defaults(func=self.generate_uuid)
 
