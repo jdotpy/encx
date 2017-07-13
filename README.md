@@ -1,17 +1,15 @@
 # Encx
  
-**Description**: 
+## Description
 
 CLI providing file encryption capability using the encx file format.
 
-**Installation**:
+## Installation
 
-Global Dependencies
-
+**Global Dependencies**
 * Python3
 
-Linux Dependencies
-
+**Linux Dependencies**
 For linux distributions you'll need to get the python / openssl dependencies:
 
 	# Debian/Ubuntu 
@@ -20,6 +18,7 @@ For linux distributions you'll need to get the python / openssl dependencies:
 	# Fedora/RHEL:
 	sudo yum install gcc libffi-devel python-devel openssl-devel
 
+**Module installation**
 OSX and Windows should just work:
 	
 	# You might have to prefix with sudo:
@@ -73,45 +72,45 @@ To test installation:
 	$ encx keygen uuid
 	7a8f6755-f4f8-ac40-7962-c0df9c9a4b64
 
-**Advanced Usage**:
+## Advanced Usage
 
 I'll be adding a readthedocs site soon, until then just do:
 
 	encx -h
 
-**Plugins**:
+## Plugins
 
 Install these plugins for additional functionality
 
 * S3 Backend (https://github.com/jdotpy/encx_s3)
 
-	# Adds S3 protocol for easy upload/download
-	encx encrypt /local-file.txt -t s3://bucket-name/remote-file.txt.encx
-	encx decrypt s3://bucket-name/remote-file.txt.encx
+		# Adds S3 protocol for easy upload/download
+		encx encrypt /local-file.txt -t s3://bucket-name/remote-file.txt.encx
+		encx decrypt s3://bucket-name/remote-file.txt.encx
 
 * Client to `encx_vault_server` (https://github.com/jdotpy/encx_vault)
 
-	# Configure your client
-	encx vault:init 
+		# Configure your client
+		encx vault:init 
 
-	# Query documents in the vault
-	encx vault:query
+		# Query documents in the vault
+		encx vault:query
 
-	# Add documents in the vault
-	encx vault:add /local/path.txt /remote/path.txt
+		# Add documents in the vault
+		encx vault:add /local/path.txt /remote/path.txt
 
-	# Edit documents in the vault
-	encx vault:edit /remote/path.txt
+		# Edit documents in the vault
+		encx vault:edit /remote/path.txt
 
 
-**Known Issues**: 
+## Known Issues 
 
 * Maximum file size for all operations limited by size of memory due to the entire file being read. 
 * Limited number of RSA key formats supported.
 * The CLI supplies no way to examine the metadata or add to the metadata (it is just used for the encryption scheme's metadata right now).
 
 
-**What is the encx file format?**: 
+## What is the encx file format?
 
 Encryption Interchange file.
 
