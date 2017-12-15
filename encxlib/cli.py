@@ -248,6 +248,11 @@ class EncxClient():
                         continue
         raise ValueError('Could not find a writer for file: {}'.format(path))
 
+    def get_file_meta(self, path):
+        source = self.load_file(path)
+        encx_file = ENCX.from_file(io.BytesIO(source))
+        return encx_file.metadata
+
     def decrypt_file(self, path, key=None):
         if key is None:
             key = self.default_rsa_key()

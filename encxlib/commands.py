@@ -6,6 +6,7 @@ import yaml
 
 from getpass import getpass
 from uuid import uuid4
+from pprint import pprint
 import logging
 import string
 import json
@@ -177,6 +178,11 @@ class Encryption(BasePlugin):
             'run': 'set_default_key',
             'help': 'Set an RSA private key as your default key path',
         },
+        'file_meta': {
+            'parser': 'parse_file_meta',
+            'run': 'file_meta',
+            'help': 'View the metadata of an encx file',
+        },
         'encrypt': {
             'parser': 'parse_encrypt',
             'run': 'encrypt',
@@ -239,6 +245,17 @@ class Encryption(BasePlugin):
             key=args.key,
             overwrite=args.force,
         )
+
+    def parse_file_meta(self, parser):
+        parser.add_argument('source', nargs="?", help='A file source')
+        parser.add_argument('-f', '--format', action='store_true', help='Format for readability')
+
+    def file_meta(self, args):
+        metadata = self.client.get_file_meta(args.source)
+        if args.format:
+            pprint(metadata)
+        else:
+            print(json.dumps(metadata))
 
     def parse_edit(self, parser):
         parser.add_argument('source', nargs="?", help='A file source')
