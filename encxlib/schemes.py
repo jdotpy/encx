@@ -116,9 +116,6 @@ class RSAScheme(BaseScheme):
         payload = aes_decryptor.decrypt(ciphertext, iv)
         return payload
 
-class RSAScheme(BaseScheme):
-    name = 'RSA-AES-multikey'
-
 all_schemes = [AESScheme, RSAScheme]
 schemes = {scheme.name: scheme for scheme in all_schemes}
 DEFAULT_SCHEME = RSAScheme

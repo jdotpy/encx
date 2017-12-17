@@ -10,3 +10,10 @@
 .venv
 .env
 .pyenv
+
+# Build
+
+MANIFEST
+build/
+dist/
+encx.egg-info/

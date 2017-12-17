@@ -12,6 +12,7 @@ from .security import (
     to_b64_str, from_b64_str,
     AES, RSA
 )
+from .keystore import KeyStore
 from .schemes import all_schemes
 from . import commands
 
@@ -70,6 +71,35 @@ class FileFormatTest(unittest.TestCase):
 
         assert reloaded.metadata == metadata
         assert reloaded.payload.read() == my_bytes
+
+class KeyStoreTests(unittest.TestCase):
+
+    def test_add_private_key(self):
+        path = '/tmp/encx-tests-1.pem'
+        pem_private_1 = RSA.generate_key()
+        with open(path, 'w') as f:
+            f.write(pem_private_1)
+
+        key_store = KeyStore()
+        key_store.add_private_key('john', path)
+        self.assertTrue(key_store.data['private_keys']['john'] == path)
+
+        reloaded_key = key_store.load_private_key('john')
+        self.assertTrue(reloaded_key.export_private_key() == pem_private_1.export_private_key())
+
+    def test_save(self):
+        first_store = KeyStore()
+        self.assertFalse(first_store.has_changed())
+        first_store.add_private_key('john', '/tmp/john.pem')
+        self.assertTrue(first_store.has_changed())
+
+        # Save and reload
+        save = key_store.export()
+        reloaded = KeyStore(save)
+        self.assertTrue(reloaded.data['private_keys']['john'] == '/tmp/john.pem')
+
+
+
 
 #################
 ### Plugins

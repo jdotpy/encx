@@ -28,7 +28,7 @@ def load_rsa_key(source, path=True, passphrase=None):
         if passphrase is None:
             passphrase = getpass('Enter the passphrase for "{}": '.format(source))
     
-    return RSA(key_contents, passphrase).get_private_key()
+    return RSA(key_contents, passphrase).export_private_key()
 
 def generate_uuid():
     return str(uuid4())
@@ -182,7 +182,7 @@ class RSA():
             raise ValueError('Private key information unavailable')
         return self._private
 
-    def get_private_key(self, passphrase=None):
+    def export_private_key(self, passphrase=None):
         options = {
             'encoding': serialization.Encoding.PEM,
             'format': serialization.PrivateFormat.PKCS8,
@@ -196,11 +196,16 @@ class RSA():
         exported = self._get_private_key().private_bytes(**options).decode('utf-8')
         return exported
 
-    def get_public_key(self):
+    def export_public_key(self, format='pem'):
+        if format == 'pem':
+            encoding = serialization.Encoding.PEM
+        elif format == 'openssh':
+            encoding = serialization.Encoding.OpenSSH
+
         public_key = self._get_public_key()
         exported = public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+            encoding=encoding,
         ).decode('utf-8')
         return exported
 
