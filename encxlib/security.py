@@ -19,16 +19,25 @@ import os
 class SecurityError(ValueError):
     pass
 
-def load_rsa_key(source, path=True, passphrase=None):
-    if path:
-        key_contents = read_private_path(source)
-    else:
+def is_key_string(s):
+    if source.startswith('-----BEGIN'):
+        return True
+    if source.startswith('ssh-rsa'):
+        return True
+    #TODO: Support other formats
+    return False
+
+def load_rsa_key(source, passphrase=None, require_private=True):
+    if is_key_string(source):
         key_contents = source
+    elif require_private:
+        key_contents = security.read_private_path(source)
+    else:
+        key_contents = open(source).read()
     if 'ENCRYPTED' in key_contents:
         if passphrase is None:
             passphrase = getpass('Enter the passphrase for "{}": '.format(source))
-    
-    return RSA(key_contents, passphrase).export_private_key()
+    return RSA(key_contents, passphrase)
 
 def generate_uuid():
     return str(uuid4())
@@ -136,7 +145,7 @@ class RSA():
     def __init__(self, key=None, passphrase=None):
         self._private = None
         self._public = None
-        self._set_key(key, passphrase=passphrase)
+        self._from_string(key, passphrase=passphrase)
 
     @classmethod
     def generate_key(cls, size=None):
@@ -154,18 +163,23 @@ class RSA():
         ).decode('utf-8')
         return exported
 
-    def _set_key(self, key, passphrase=None):
-        key = key.encode('utf-8')
-        if b'PUBLIC' in key: # Is there a better test? pro detection for sure
+    def _from_string(self, key, passphrase=None):
+        key_bytes = key.encode('utf-8')
+        if key.startswith('ssh-rsa'):
+            self._public = serialization.load_ssh_public_key(
+                key_bytes,
+                backend=default_backend(),
+            )
+        elif 'PUBLIC' in key: # Is there a better test? pro detection for sure
             self._public = serialization.load_pem_public_key(
-                key,
+                key_bytes,
                 backend=default_backend(),
             )
         else:
             if passphrase:
                 passphrase = passphrase.encode('utf-8')
             self._private = serialization.load_pem_private_key(
-                key,
+                key_bytes,
                 password=passphrase,
                 backend=default_backend(),
             )
@@ -181,6 +195,9 @@ class RSA():
         if not self._private:
             raise ValueError('Private key information unavailable')
         return self._private
+
+    def has_private_portion(self):
+        return bool(self._private)
 
     def export_private_key(self, passphrase=None):
         options = {
@@ -199,12 +216,14 @@ class RSA():
     def export_public_key(self, format='pem'):
         if format == 'pem':
             encoding = serialization.Encoding.PEM
+            key_format = serialization.PublicFormat.SubjectPublicKeyInfo
         elif format == 'openssh':
             encoding = serialization.Encoding.OpenSSH
+            key_format = serialization.PublicFormat.OpenSSH
 
         public_key = self._get_public_key()
         exported = public_key.public_bytes(
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+            format=key_format,
             encoding=encoding,
         ).decode('utf-8')
         return exported

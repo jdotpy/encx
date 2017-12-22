@@ -3,10 +3,11 @@ import yaml
 from . import security
 from .spec import ENCX
 from .schemes import get_scheme, DEFAULT_SCHEME
+from .keystore import KeyStore
+from .commands import BasePlugin
 
 from importlib import import_module
 from collections import OrderedDict
-from .commands import BasePlugin
 from pprint import pprint
 import subprocess
 import logging
@@ -39,9 +40,11 @@ class EncxClient():
 
     default_config_dir = os.path.expanduser('~/encx')
     default_config_file = 'encx.yaml'
+    default_keystore_file = 'keystore.yaml'
     base_plugins = [
         'encxlib.commands.SimpleFileLoaders',
         'encxlib.commands.PluginManagement',
+        'encxlib.commands.KeyStoreManagement',
         'encxlib.commands.Encryption',
         'encxlib.commands.Keygen',
     ]
@@ -49,8 +52,21 @@ class EncxClient():
     def __init__(self, config_path=None):
         self.config_path = config_path
         self._load_configuration()
+        self._load_keystore()
         self._load_plugins()
         self.parser = self._build_cli()
+
+    def _load_keystore(self):
+        path = self.get_keystore_file_path()
+        try:
+            contents = security.read_private_path(path)
+        except FileNotFoundError as e:
+            logging.info('Skipping keystore load as the file appears not to exist')
+            self.keystore = KeyStore()
+        else:
+            data = yaml.safe_load(contents)
+            self.keystore = KeyStore(data)
+        return self.keystore
 
     def _load_configuration(self):
         # self.config_path is also a flag to determine whether our
@@ -75,20 +91,27 @@ class EncxClient():
         else:
             # We loaded the file, set the config_path
             self.config_path = path
-            self._config = yaml.load(contents)
+            self._config = yaml.safe_load(contents)
         return self._config
 
     def _save_configuration(self, force=False):
-        if not self._config_changed:
-            return False
-        path = self.get_config_file_path()
-        if not os.path.exists(path):
-            create_config = input('Create new config at location "{}" (yes/no)?'.format(path))
-            if create_config in 'no':
-                return False
-        dumped_config = yaml.dump(self._config)
-        security.write_private_path(path, dumped_config)
-        self._config_changed = False # Reset the flag in case this was forced
+        if self._config_changed:
+            path = self.get_config_file_path()
+            if not os.path.exists(path):
+                create_config = input('Create new config at location "{}" (yes/no)?'.format(path))
+                if create_config in 'no':
+                    return False
+            dumped_config = yaml.dump(self._config)
+            security.write_private_path(path, dumped_config)
+            self._config_changed = False # Reset the flag in case this was forced
+
+        if self.keystore.has_changed():
+            keystore_path = self.get_keystore_file_path()
+            dumped_data = yaml.dump(self.keystore.export())
+            security.write_private_path(keystore_path, dumped_data)
+
+        return True
+            
 
     def _load_plugins(self):
         self.plugins = OrderedDict()
@@ -197,14 +220,12 @@ class EncxClient():
     def default_rsa_key(self):
         return self.get_config().get('default_key_path', None)
 
+    def get_keystore_file_path(self):
+        path = os.path.join(self.get_config_dir(), self.default_keystore_file)
+        return path
+
     def get_config_file_path(self):
-        if self.config_path:
-            if '.' in self.config_path:
-                path = self.config_path
-            else:
-                path = os.path.join(self.config_path, self.default_config_file)
-        else:
-            path = os.path.join(self.get_config_dir(), self.default_config_file)
+        path = os.path.join(self.get_config_dir(), self.default_config_file)
         return path
 
     def get_config_dir(self):
@@ -365,3 +386,17 @@ class EncxClient():
 
         security.remove_path(tmp_path)
         return success, new_data;
+
+    def get_private_key(self, source):
+        match = self.keystore.get_private_key(source, require_match=False)
+        if match:
+            return match
+        return security.load_rsa_key(source)
+
+    def get_public_keys(self, source, use_store=True):
+        if use_store:
+            match = self.keystore.get_public_key(source, require_match=False)
+            if match:
+                return match
+        return security.load_rsa_key(source)
+

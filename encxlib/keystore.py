@@ -9,6 +9,9 @@ class MultipleKeysFoundError(KeyError):
 class IncorrectKeyTypeError(ValueError):
     pass
 
+class InvalidAliasError(ValueError):
+    pass
+
 class KeyStore():
     """
         Stores private key paths (no actual data), Aliases public
@@ -43,62 +46,86 @@ class KeyStore():
     def add_private_key(self, name, path, validate=True):
         if validate:
             key = security.load_rsa_key(path)
+            assert key.has_private_portion()
         self.mark_changed()
         self.data[name] = {
-            'type': 'private',
+            'type': 'private_key',
             'value': path,
         }
 
     def add_public_key(self, name, key):
         self.mark_changed()
         self.data[name] = {
-            'type': 'public',
+            'type': 'public_key',
             'value': key.export_public_key('openssh'),
         }
 
     def add_alias(self, alias, names):
         self.mark_changed()
-        self.data[name] = {
+        self.data[alias] = {
             'type': 'alias',
-            'value': [],
+            'value': names,
         }
+
+    def add_to_alias(self, alias, names):
+        entry = self.data.get(alias, None)
+        if not entry or entry['type'] != alias:
+            raise InvalidAliasError('Cannot add to an alias that doesnt exist')
+        self.mark_changed()
+        entry['value'].extend(names)
 
     def resolve_alias(self, root_alias):
         matches = []
         aliases = [root_alias]
         seen_aliases = {root_alias: True}
         while aliases:
-            # Map to valeus
+            # Map to values
             next_aliases = []
             for a in aliases:
-                value = self.data.get(a, None)
-                if not value:
+                entry = self.data.get(a, None)
+                if not entry:
                     logging.warn('Key alias "{}" does not exist.'.format(a))
                     continue
 
-                if value['type'] == 'alias':
-                    for new_alias in value['value']:
+                value = entry['value']
+                if entry['type'] == 'alias':
+                    for new_alias in value:
                         if new_alias in seen_aliases:
                             # Skip any we've already come across
                             # This prevents infinite looping
                             continue
                         next_aliases.append(new_alias)
                         seen_aliases[new_alias] = True
-                        
                 else:
-                    matches.append(value)
-                values.append(value)
+                    matches.append(entry)
             aliases = next_aliases
         return matches
 
-    def get_private_key(self, alias):
+    def get_private_key(self, alias, require_match=True):
         matches = self.resolve_alias(alias)
-        if not matches:
+        if not matches and require_match:
             raise KeyAliasNotFoundError('Alias {} not found!'.format(alias))
         if len(matches) > 1:
             raise MultipleKeysFoundError('Alias {} returned multiple entries!'.format(alias))
         entry = matches[0]
+        if not entry:
+            return None
         if entry['type'] != 'private_key':
             raise IncorrectKeyTypeError('Alias {} returned a public key!'.format(alias))
 
         return security.load_rsa_key(entry['value'])
+
+    def get_public_keys(self, alias, require_match=True):
+        matches = self.resolve_alias(alias)
+        if not matches and require_match:
+            raise KeyAliasNotFoundError('Alias {} not found!'.format(alias))
+        return [security.RSA(match['value']) for match in matches]
+
+    def get_public_key(self, alias, require_match=True):
+        matches = self.get_public_keys(alias, require_match=require_match)
+        if not len(matches) == 1:
+            raise MultipleKeysFoundError('Alias {} returned multiple entries!'.format(alias))
+        return matches[0]
+
+    def get_entries(self, alias):
+        return self.resolve_alias(alias)

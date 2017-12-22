@@ -78,7 +78,7 @@ class RSAScheme(BaseScheme):
 
         # Now we use the rsa key given to encrypt the key we generated to 
         # package with the payload
-        rsa_encryptor = security.RSA(self.key)
+        rsa_encryptor = self.key
         rsa_ciphertext, rsa_metadata = rsa_encryptor.encrypt(aes_encryptor.key)
 
         encrypted_key = security.to_b64_str(rsa_ciphertext)
@@ -105,7 +105,7 @@ class RSAScheme(BaseScheme):
         encrypted_key = security.from_b64_str(encrypted_key_str)
 
         # Decrypt the AES key that was used on the payload
-        rsa_decryptor = security.RSA(self.key)
+        rsa_decryptor = self.key
         aes_key = rsa_decryptor.decrypt(encrypted_key)
 
         # Now do the decryption of the actual payload

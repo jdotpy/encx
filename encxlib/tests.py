@@ -1,4 +1,6 @@
 import unittest
+from unittest import mock
+
 import base64
 import yaml
 import json
@@ -12,6 +14,7 @@ from .security import (
     to_b64_str, from_b64_str,
     AES, RSA
 )
+from . import security
 from .keystore import KeyStore
 from .schemes import all_schemes
 from . import commands
@@ -73,32 +76,60 @@ class FileFormatTest(unittest.TestCase):
         assert reloaded.payload.read() == my_bytes
 
 class KeyStoreTests(unittest.TestCase):
-
     def test_add_private_key(self):
         path = '/tmp/encx-tests-1.pem'
         pem_private_1 = RSA.generate_key()
-        with open(path, 'w') as f:
-            f.write(pem_private_1)
-
-        key_store = KeyStore()
-        key_store.add_private_key('john', path)
-        self.assertTrue(key_store.data['private_keys']['john'] == path)
-
-        reloaded_key = key_store.load_private_key('john')
-        self.assertTrue(reloaded_key.export_private_key() == pem_private_1.export_private_key())
+        with mock.patch.object(
+            security,
+            'read_private_path',
+            return_value=pem_private_1
+        ):
+            key_store = KeyStore()
+            key_store.add_private_key('john', path)
+            reloaded_key = key_store.get_private_key('john')
+            self.assertTrue(reloaded_key.export_private_key() == pem_private_1)
 
     def test_save(self):
         first_store = KeyStore()
-        self.assertFalse(first_store.has_changed())
-        first_store.add_private_key('john', '/tmp/john.pem')
-        self.assertTrue(first_store.has_changed())
+        path = '/tmp/encx-tests-1.pem'
+        pem_private_1 = RSA.generate_key()
+        with mock.patch.object(
+            security,
+            'read_private_path',
+            return_value=pem_private_1
+        ):
+            self.assertFalse(first_store.has_changed())
+            first_store.add_private_key('john', path)
+            self.assertTrue(first_store.has_changed())
 
-        # Save and reload
-        save = key_store.export()
-        reloaded = KeyStore(save)
-        self.assertTrue(reloaded.data['private_keys']['john'] == '/tmp/john.pem')
+            # Save and reload
+            save = first_store.export()
+            reloaded = KeyStore(save)
+            reloaded_key = reloaded.get_private_key('john')
+            self.assertTrue(reloaded_key.export_private_key() == pem_private_1)
 
+    def test_add_public_key(self):
+        generated_key = RSA(RSA.generate_key())
+        generated_pub = generated_key.export_public_key('openssh')
 
+        key_store = KeyStore()
+        key_store.add_public_key('john', generated_key)
+        match = key_store.get_public_key('john')
+        self.assertTrue(generated_pub == match.export_public_key('openssh'))
+
+    def test_aliases(self):
+        generated_key = RSA(RSA.generate_key())
+        generated_pub = generated_key.export_public_key('openssh')
+
+        key_store = KeyStore()
+        key_store.add_public_key('john', generated_key)
+        key_store.add_alias('A_1', ['john'])
+        key_store.add_alias('A_2', ['A_1'])
+        key_store.add_alias('A_3', ['A_1', 'john'])
+
+        for a in ('A_1', 'A_2', 'A_3'):
+            match = key_store.get_public_key(a)
+            self.assertTrue(generated_pub == match.export_public_key('openssh'))
 
 
 #################

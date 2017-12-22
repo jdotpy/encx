@@ -170,6 +170,93 @@ class PluginManagement(BasePlugin):
                 print('\t{}: {}'.format(cmd, cmd_info.get('help', 'No documentation available')))
             print('\n')
 
+class KeyStoreManagement(BasePlugin):
+    name = 'keystore_management'
+    commands = {
+        'keystore:show': {
+            'parser': 'parse_show',
+            'run': 'show',
+            'help': 'Show entries in the keystore',
+        },
+        'keystore:add_alias': {
+            'parser': 'parse_add_alias',
+            'run': 'add_alias',
+            'help': 'Give one or more keys (or other aliases) an alias',
+        },
+        'keystore:add_to_alias': {
+            'parser': 'parse_add_to_alias',
+            'run': 'add_to_alias',
+            'help': 'Append to an existing alias one or more keys (or other aliases)',
+        },
+        'keystore:add_public_keys': {
+            'parser': 'parse_add_public_keys',
+            'run': 'add_public_keys',
+            'help': 'Add public key(s) to the store with a given name',
+        },
+        'keystore:add_private_key': {
+            'parser': 'parse_add_private_key',
+            'run': 'add_private_key',
+            'help': 'Add a private key\'s path to the store giving it a name (key is not copied)',
+        },
+    }
+
+    def parse_show(self, parser):
+        parser.add_argument('alias', nargs="?", help='Show only specified alias')
+
+    def show(self, args):
+        if args.alias:
+            entries = self.client.keystore.get_entries(args.alias)
+            print(yaml.dump(entries))
+        else:
+            print(yaml.dump(self.client.keystore.data))
+
+    def parse_add_alias(self, parser):
+        parser.add_argument('alias', nargs=1, help='Name to give to this key/group')
+        parser.add_argument('keys', nargs="+", help='Keys or other aliases this should include')
+
+    def add_alias(self, args):
+        self.client.keystore.add_alias(args.alias[0], args.keys)
+
+    def parse_add_to_alias(self, parser):
+        parser.add_argument('alias', nargs=1, help='Name to give to this key/group')
+        parser.add_argument('keys', nargs="+", help='Keys or other aliases this should include')
+
+    def add_to_alias(self, args):
+        self.client.keystore.add_to_alias(args.alias[0], args.keys)
+
+    def parse_add_private_key(self, parser):
+        parser.add_argument('name', nargs=1, help='Name to give to this key')
+        parser.add_argument('path', nargs=1, help='Path to private key')
+
+    def add_private_key(self, args):
+        self.client.keystore.add_private_key(args.name[0], args.path[0])
+
+    def parse_add_public_keys(self, parser):
+        parser.add_argument('name', nargs=1, help='Name to give to this key')
+        parser.add_argument('source', nargs=1, help='Source of public key')
+
+    def add_public_keys(self, args):
+        alias = args.name[0]
+        keys = self.client.get_public_keys(args.source[0], use_store=False)
+        if not keys:
+            logging.error('No public keys found!')
+            return False
+        if len(keys) == 1:
+            self.client.keystore.add_private_key(alias, keys[0])
+        else:
+            key_names = []
+            for i, key in enumerate(keys):
+                key_name = '{}_{}'.format(alias, i)
+                key_names.append(key_name)
+                self.client.keystore.add_public_key(key_name, key)
+            self.client.keystore.add_alias(alias, key_names)
+
+        
+            
+            
+            
+
+
 class Encryption(BasePlugin):
     name = 'encryption'
     commands = {
@@ -236,7 +323,7 @@ class Encryption(BasePlugin):
         source_data = self.client.load_file(args.source)
         if args.scheme not in schemes:
             print('Scheme not found!')
-            sys.exit(1)
+            return False
         scheme = schemes.get(args.scheme)
         self.client.encrypt_file(
             args.target,
