@@ -245,7 +245,7 @@ class KeyStoreManagement(BasePlugin):
             logging.error('No public keys found!')
             return False
         if len(keys) == 1:
-            self.client.keystore.add_private_key(alias, keys[0])
+            self.client.keystore.add_public_key(alias, keys[0])
         else:
             key_names = []
             for i, key in enumerate(keys):
