@@ -233,11 +233,14 @@ class KeyStoreManagement(BasePlugin):
 
     def parse_add_public_keys(self, parser):
         parser.add_argument('name', nargs=1, help='Name to give to this key')
-        parser.add_argument('source', nargs=1, help='Source of public key')
+        parser.add_argument('source', nargs='?', help='Source of public key', default='-')
 
     def add_public_keys(self, args):
         alias = args.name[0]
-        keys = self.client.get_public_keys(args.source[0], use_store=False)
+        source = args.source
+        if source == '-':
+            source = sys.stdin.read()
+        keys = self.client.get_public_keys(source, use_store=False)
         if not keys:
             logging.error('No public keys found!')
             return False
@@ -250,11 +253,6 @@ class KeyStoreManagement(BasePlugin):
                 key_names.append(key_name)
                 self.client.keystore.add_public_key(key_name, key)
             self.client.keystore.add_alias(alias, key_names)
-
-        
-            
-            
-            
 
 
 class Encryption(BasePlugin):

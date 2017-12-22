@@ -9,6 +9,7 @@ from .commands import BasePlugin
 from importlib import import_module
 from collections import OrderedDict
 from pprint import pprint
+import requests
 import subprocess
 import logging
 import argparse
@@ -17,6 +18,9 @@ import sys
 import io
 import os
 import re
+
+GITHUB_USER_PROTO = 'github://'
+
 
 class FileLoaderInvalidPath(ValueError):
     pass
@@ -394,9 +398,23 @@ class EncxClient():
         return security.load_rsa_key(source)
 
     def get_public_keys(self, source, use_store=True):
+        sources = [source]
         if use_store:
-            match = self.keystore.get_public_key(source, require_match=False)
-            if match:
-                return match
-        return security.load_rsa_key(source)
+            matches = self.keystore.get_public_keys(source, require_match=False)
+            if matches:
+                return matches
+
+        if source.startswith('https://'):
+            result = requests.get(source).text
+            # Special-casing github's multi-line format
+            if result.startswith('ssh-rsa'):
+                sources = result.strip().split('\n')
+            else:
+                sources = [result]
+        elif source.startswith(GITHUB_USER_PROTO):
+            username = source[len(GITHUB_USER_PROTO):]
+            result = requests.get('https://github.com/{}.keys'.format(username)).text
+            sources = result.strip().split('\n')
+
+        return [security.load_rsa_key(s) for s in sources]
 

@@ -20,9 +20,9 @@ class SecurityError(ValueError):
     pass
 
 def is_key_string(s):
-    if source.startswith('-----BEGIN'):
+    if s.startswith('-----BEGIN'):
         return True
-    if source.startswith('ssh-rsa'):
+    if s.startswith('ssh-rsa'):
         return True
     #TODO: Support other formats
     return False

@@ -15,6 +15,7 @@ setup(
     install_requires=[
         'cryptography',
         'pyyaml',
+        'requests',
     ],
     scripts=[
         'bin/encx',
