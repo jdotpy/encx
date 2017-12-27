@@ -279,22 +279,28 @@ class EncxClient():
         return encx_file.metadata
 
     def decrypt_file(self, path, key=None):
-        if key is None:
-            key = self.default_rsa_key()
-
+        loaded_key = self.get_private_key(key)
         source = self.load_file(path)
         encx_file = ENCX.from_file(io.BytesIO(source))
         Scheme = get_scheme(encx_file.metadata)
-        scheme = Scheme(key=key)
-        payload = scheme.decrypt(encx_file.payload.read(), encx_file.metadata)
+        scheme = Scheme(keys=[loaded_key])
+        scheme_metadata = encx_file.metadata.get('scheme_metadata', {})
+        payload = scheme.decrypt(encx_file.payload.read(), scheme_metadata)
         return payload, encx_file.metadata
 
-    def encrypt_file(self, path, data, scheme=DEFAULT_SCHEME, key=None, overwrite=False):
-        if key is None:
-            key = self.default_rsa_key()
+    def encrypt_file(self, path, data, scheme=DEFAULT_SCHEME, keys=None, overwrite=False, signature=None):
+        if scheme.key_type == scheme.KEY_TYPE_RSA:
+            keys = self.get_public_keys(keys)
 
-        scheme_instance = scheme(key=key)
-        encrypted_payload, metadata = scheme_instance.encrypt(data)
+        if not keys:
+            raise ValueError('No key specified and no default set!')
+
+        scheme_instance = scheme(keys=keys)
+        encrypted_payload, scheme_metadata = scheme_instance.encrypt(data)
+        metadata = {
+            'scheme': scheme.name,
+            'scheme_metadata': scheme_metadata,
+        }
         encx_file = ENCX(metadata, io.BytesIO(encrypted_payload))
         output_stream = encx_file.to_file(io.BytesIO())
         output_stream.seek(0)
@@ -392,29 +398,42 @@ class EncxClient():
         return success, new_data;
 
     def get_private_key(self, source):
-        match = self.keystore.get_private_key(source, require_match=False)
-        if match:
-            return match
+        if not source:
+            return self.default_rsa_key()
+        if self.keystore.has_key(source):
+            return self.keystore.get_private_key(source, require_match=False)
         return security.load_rsa_key(source)
 
-    def get_public_keys(self, source, use_store=True):
-        sources = [source]
-        if use_store:
-            matches = self.keystore.get_public_keys(source, require_match=False)
-            if matches:
-                return matches
-
-        if source.startswith('https://'):
-            result = requests.get(source).text
-            # Special-casing github's multi-line format
-            if result.startswith('ssh-rsa'):
-                sources = result.strip().split('\n')
+    def get_public_keys(self, sources, use_store=True):
+        """
+            Despite the name, this functions result may be an RSA key object that is
+            the private portion (source may be path to private key). The public portion
+            needed to encrypt will be derived by the RSA wrapper without additional logic.
+        """
+        if not sources:
+            if self.default_rsa_key():
+                return [self.default_rsa_key()]
             else:
-                sources = [result]
-        elif source.startswith(GITHUB_USER_PROTO):
-            username = source[len(GITHUB_USER_PROTO):]
-            result = requests.get('https://github.com/{}.keys'.format(username)).text
-            sources = result.strip().split('\n')
+                return []
 
-        return [security.load_rsa_key(s) for s in sources]
+        matches = []
+        for source in sources:
+            if use_store and self.keystore.has_key(source):
+                matches.extend(self.keystore.get_public_keys(source, require_match=False))
+                continue
 
+            entries = [source]
+            if source.startswith('https://'):
+                result = requests.get(source).text
+                # Special-casing github's multi-line format
+                if result.startswith('ssh-rsa'):
+                    entries = result.strip().split('\n')
+                else:
+                    entries = [result]
+            elif source.startswith(GITHUB_USER_PROTO):
+                username = source[len(GITHUB_USER_PROTO):]
+                result = requests.get('https://github.com/{}.keys'.format(username)).text
+                entries = result.strip().split('\n')
+
+            matches.extend([security.load_rsa_key(entry) for entry in entries])
+        return matches

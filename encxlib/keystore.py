@@ -35,7 +35,7 @@ class KeyStore():
     def export(self):
         return self.data
 
-    def key_exists(self, name):
+    def has_key(self, name):
         if name in self.data:
             return True
         return False
@@ -44,13 +44,13 @@ class KeyStore():
         self.data.pop(name, None)
 
     def add_private_key(self, name, path, validate=True):
-        if validate:
-            key = security.load_rsa_key(path)
-            assert key.has_private_portion()
+        key = security.load_rsa_key(path)
+        assert key.has_private_portion()
         self.mark_changed()
         self.data[name] = {
             'type': 'private_key',
             'value': path,
+            'public_key': key.export_public_key('openssh'),
         }
 
     def add_public_key(self, name, key):
@@ -69,7 +69,7 @@ class KeyStore():
 
     def add_to_alias(self, alias, names):
         entry = self.data.get(alias, None)
-        if not entry or entry['type'] != alias:
+        if not entry or entry['type'] != 'alias':
             raise InvalidAliasError('Cannot add to an alias that doesnt exist')
         self.mark_changed()
         entry['value'].extend(names)

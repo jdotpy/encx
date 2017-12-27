@@ -48,12 +48,11 @@ class EncryptionSchemeTests(unittest.TestCase):
 
             # Encrypt our value
             key = Scheme.generate_key()
-            enc_scheme = Scheme(key)
+            enc_scheme = Scheme([key])
             ciphertext, meta = enc_scheme.encrypt(my_value)
 
-
             # ... and back again
-            dec_scheme = Scheme(key)
+            dec_scheme = Scheme([key])
             payload = dec_scheme.decrypt(ciphertext, meta)
 
             self.assertEqual(payload, my_value)

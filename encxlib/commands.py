@@ -254,7 +254,6 @@ class KeyStoreManagement(BasePlugin):
                 self.client.keystore.add_public_key(key_name, key)
             self.client.keystore.add_alias(alias, key_names)
 
-
 class Encryption(BasePlugin):
     name = 'encryption'
     commands = {
@@ -313,7 +312,7 @@ class Encryption(BasePlugin):
     def parse_encrypt(self, parser):
         parser.add_argument('source', nargs="?", default='-', help='A file source')
         parser.add_argument('-s', '--scheme', dest='scheme', help='Scheme to use to encrypt', default=DEFAULT_SCHEME.name)
-        parser.add_argument('-k', '--key', dest='key', help='Key for encryption', default=None)
+        parser.add_argument('-k', '--key', nargs='*', dest='keys', help='Key for encryption', default=None)
         parser.add_argument('-t', '--target', default='-', help='Target path for output (default is "-" for stdout')
         parser.add_argument('-f', '--force', action='store_true', help='Overwrite any existing file')
 
@@ -327,7 +326,7 @@ class Encryption(BasePlugin):
             args.target,
             source_data,
             scheme=scheme,
-            key=args.key,
+            keys=args.keys,
             overwrite=args.force,
         )
 
