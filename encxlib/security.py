@@ -28,7 +28,6 @@ def is_key_string(s):
     return False
 
 def load_rsa_key(source, passphrase=None, require_private=True):
-    print('loading key:', source)
     if is_key_string(source):
         key_contents = source
     elif require_private:

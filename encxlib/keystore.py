@@ -42,6 +42,7 @@ class KeyStore():
 
     def delete_key(self, name):
         self.data.pop(name, None)
+        self.mark_changed()
 
     def add_private_key(self, name, path, validate=True):
         key = security.load_rsa_key(path)

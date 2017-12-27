@@ -198,6 +198,11 @@ class KeyStoreManagement(BasePlugin):
             'run': 'add_private_key',
             'help': 'Add a private key\'s path to the store giving it a name (key is not copied)',
         },
+        'keystore:remove': {
+            'parser': 'parse_remove',
+            'run': 'remove',
+            'help': 'Remove an alias or key from the keystore',
+        },
     }
 
     def parse_show(self, parser):
@@ -253,6 +258,12 @@ class KeyStoreManagement(BasePlugin):
                 key_names.append(key_name)
                 self.client.keystore.add_public_key(key_name, key)
             self.client.keystore.add_alias(alias, key_names)
+
+    def parse_remove(self, parser):
+        parser.add_argument('name', nargs=1, help='Name of key or alias to remove')
+
+    def remove(self, args):
+        self.client.keystore.delete_key(args.name[0])
 
 class Encryption(BasePlugin):
     name = 'encryption'

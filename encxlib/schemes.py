@@ -120,8 +120,6 @@ class RSAScheme(BaseScheme):
         exported_public_key = key.export_public_key('openssh')
         rsa_entry = find(rsa_meta_entries, lambda x: x['public_key'] == exported_public_key)
         if not rsa_entry:
-            print('Given key:', exported_public_key)
-            print('keys:', rsa_meta_entries)
             raise ValueError('No matching RSA key found for decryption')
         encrypted_key_str = rsa_entry.get('encrypted_key', None)
         if not encrypted_key_str:
