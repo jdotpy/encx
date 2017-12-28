@@ -40,6 +40,17 @@ class KeyStore():
             return True
         return False
 
+    def is_trusted_key(self, public_key):
+        openssh_key = public_key.export_public_key('openssh')
+        for name, entry in self.data.items():
+            if not entry.get('type') == 'public_key':
+                # We're only interested in public keys
+                continue
+            if entry.get('public_key') == openssh_key:
+                logging.info('Confirming key is trusted with name: {}.'.format(name))
+                return True
+        return False
+
     def delete_key(self, name):
         self.data.pop(name, None)
         self.mark_changed()

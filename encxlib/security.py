@@ -28,12 +28,15 @@ def is_key_string(s):
     return False
 
 def load_rsa_key(source, passphrase=None, require_private=True):
-    if is_key_string(source):
-        key_contents = source
-    elif require_private:
-        key_contents = read_private_path(source)
-    else:
-        key_contents = open(source).read()
+    try:
+        if is_key_string(source):
+            key_contents = source
+        elif require_private:
+            key_contents = read_private_path(source)
+        else:
+            key_contents = open(source).read()
+    except FileNotFoundError:
+        return None
     if 'ENCRYPTED' in key_contents:
         if passphrase is None:
             passphrase = getpass('Enter the passphrase for "{}": '.format(source))

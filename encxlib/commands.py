@@ -312,9 +312,22 @@ class Encryption(BasePlugin):
         parser.add_argument('source', nargs="?", help='A file source')
         parser.add_argument('-k', '--key', dest='key', help='Key to use to decrypt')
         parser.add_argument('-d', '--decode', dest='decode', action='store_true', help='Decode data')
+        parser.add_argument('-g', '--signer', default=False, nargs='?', help='Require a signature (optionally: of specified key)')
+        parser.add_argument('-a', '--allow_anonymous', action='store_true', help='Allow signing keys not in the keystore (ignored if signing key is specified)')
 
     def decrypt(self, args):
-        data, metadata = self.client.decrypt_file(args.source, args.key)
+        # If the signer flag is specified (None) but not set to anything, toggle it on
+        if args.signer is None:
+            signer = True
+        else:
+            signer = args.signer
+
+        data, metadata = self.client.decrypt_file(
+            args.source,
+            args.key,
+            require_signature=signer,
+            allow_anonymous=args.allow_anonymous,
+        )
         if args.decode:
             print(data.decode('utf-8'))
         else:
@@ -326,12 +339,23 @@ class Encryption(BasePlugin):
         parser.add_argument('-k', '--key', nargs='*', dest='keys', help='Key for encryption', default=None)
         parser.add_argument('-t', '--target', default='-', help='Target path for output (default is "-" for stdout')
         parser.add_argument('-f', '--force', action='store_true', help='Overwrite any existing file')
+        parser.add_argument('-g', '--sign', default=False, nargs='?', help='Sign with specified private key')
 
     def encrypt(self, args):
+        print('sign:', type(args.sign), args.sign)
         source_data = self.client.load_file(args.source)
         if args.scheme not in schemes:
             print('Scheme not found!')
             return False
+
+        # We set the default of args.sign to False in order to be able to know when they 
+        # specified "--sign" without a value as we infer that the encryption key includes
+        # the private portion and encryption should occur with that
+        if args.sign is None:
+            signer = args.keys[0]
+        else:
+            signer = args.sign
+
         scheme = schemes.get(args.scheme)
         self.client.encrypt_file(
             args.target,
@@ -339,6 +363,7 @@ class Encryption(BasePlugin):
             scheme=scheme,
             keys=args.keys,
             overwrite=args.force,
+            signer=signer,
         )
 
     def parse_file_meta(self, parser):

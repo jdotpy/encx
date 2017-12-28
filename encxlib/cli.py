@@ -278,22 +278,48 @@ class EncxClient():
         encx_file = ENCX.from_file(io.BytesIO(source))
         return encx_file.metadata
 
-    def decrypt_file(self, path, key=None):
-        loaded_key = self.get_private_key(key)
+    def decrypt_file(self, path, key=None, require_signature=None, allow_anonymous=False):
+        loaded_key = self.get_private_key(key, require=True)
         source = self.load_file(path)
         encx_file = ENCX.from_file(io.BytesIO(source))
         Scheme = get_scheme(encx_file.metadata)
         scheme = Scheme(keys=[loaded_key])
         scheme_metadata = encx_file.metadata.get('scheme_metadata', {})
         payload = scheme.decrypt(encx_file.payload.read(), scheme_metadata)
+
+        # Verify signature if necessary
+        signature_data = encx_file.metadata.get('signature', None)
+        if signature_data:
+            signature = signature_data.get('signature', None)
+            signing_key_string = signature_data.get('public_key', None)
+            signing_key = security.RSA(signing_key_string)
+            if not signing_key.verify(payload, signature):
+                raise ValueError('Invalid signature!')
+
+            if type(require_signature) != bool:
+                # Check that signature matches one of specified 
+                match = False
+                for key in self.get_public_keys([require_signature]):
+                    if key.export_public_key('openssh') == signing_key_string:
+                        match = True
+                        break
+                if not match:
+                    raise ValueError('Signing key "{}", does not match specified "{}"'.format(signing_key_string, require_signature))
+            elif not self.keystore.is_trusted_key(signing_key) and not allow_anonymous:
+                # It should at least be in our store if it isn't specified
+                raise ValueError('Signing key {} is not in trusted key store!'.format(signing_key_string))
+
+        elif require_signature:
+            raise ValueError('No signature for validating data found!')
+        
         return payload, encx_file.metadata
 
-    def encrypt_file(self, path, data, scheme=DEFAULT_SCHEME, keys=None, overwrite=False, signature=None):
+    def encrypt_file(self, path, data, scheme=DEFAULT_SCHEME, keys=None, overwrite=False, signer=None):
         if scheme.key_type == scheme.KEY_TYPE_RSA:
             keys = self.get_public_keys(keys)
 
         if not keys:
-            raise ValueError('No key specified and no default set!')
+            raise ValueError('No encrypting keys found!')
 
         scheme_instance = scheme(keys=keys)
         encrypted_payload, scheme_metadata = scheme_instance.encrypt(data)
@@ -301,6 +327,16 @@ class EncxClient():
             'scheme': scheme.name,
             'scheme_metadata': scheme_metadata,
         }
+        if signer:
+            signing_key = self.get_private_key(signer)
+            if not signing_key:
+                raise ValueError('No signing key specified and no default set!')
+            signature = signing_key.sign(data)
+            metadata['signature'] = {
+                'public_key': signing_key.export_public_key('openssh'),
+                'signature': signature,
+            }
+
         encx_file = ENCX(metadata, io.BytesIO(encrypted_payload))
         output_stream = encx_file.to_file(io.BytesIO())
         output_stream.seek(0)
@@ -397,12 +433,18 @@ class EncxClient():
         security.remove_path(tmp_path)
         return success, new_data;
 
-    def get_private_key(self, source):
+    def get_private_key(self, source, require=True):
         if not source:
-            return self.default_rsa_key()
-        if self.keystore.has_key(source):
-            return self.keystore.get_private_key(source, require_match=False)
-        return security.load_rsa_key(source)
+            match = self.default_rsa_key()
+            if not match and require:
+                raise ValueError('No private key specified and no default set!')
+        elif self.keystore.has_key(source):
+            match = self.keystore.get_private_key(source, require_match=False)
+        else:
+            match = security.load_rsa_key(source)
+        if not match and require:
+            raise ValueError('No private key matches given source: {}'.format(source))
+        return match
 
     def get_public_keys(self, sources, use_store=True):
         """
@@ -435,5 +477,9 @@ class EncxClient():
                 result = requests.get('https://github.com/{}.keys'.format(username)).text
                 entries = result.strip().split('\n')
 
-            matches.extend([security.load_rsa_key(entry) for entry in entries])
+            for entry in entries:
+                entry_match = security.load_rsa_key(entry)
+                if not entry_match:
+                    raise ValueError('Source "{}" did not match any keys!'.format(entry))
+                matches.append(entry_match)
         return matches
