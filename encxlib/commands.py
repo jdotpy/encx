@@ -188,6 +188,11 @@ class KeyStoreManagement(BasePlugin):
             'run': 'add_to_alias',
             'help': 'Append to an existing alias one or more keys (or other aliases)',
         },
+        'keystore:add_public_key': {
+            'parser': 'parse_add_public_keys',
+            'run': 'add_public_keys',
+            'help': 'Add public key(s) to the store with a given name',
+        },
         'keystore:add_public_keys': {
             'parser': 'parse_add_public_keys',
             'run': 'add_public_keys',
@@ -314,6 +319,7 @@ class Encryption(BasePlugin):
         parser.add_argument('-d', '--decode', dest='decode', action='store_true', help='Decode data')
         parser.add_argument('-g', '--signer', default=False, nargs='?', help='Require a signature (optionally: of specified key)')
         parser.add_argument('-a', '--allow_anonymous', action='store_true', help='Allow signing keys not in the keystore (ignored if signing key is specified)')
+        parser.add_argument('-x', '--no_verify', action='store_true', help='Do not do any signature verification')
 
     def decrypt(self, args):
         # If the signer flag is specified (None) but not set to anything, toggle it on
@@ -327,6 +333,7 @@ class Encryption(BasePlugin):
             args.key,
             require_signature=signer,
             allow_anonymous=args.allow_anonymous,
+            ignore_signature=args.no_verify,
         )
         if args.decode:
             print(data.decode('utf-8'))
@@ -349,7 +356,7 @@ class Encryption(BasePlugin):
 
         # We set the default of args.sign to False in order to be able to know when they 
         # specified "--sign" without a value as we infer that the encryption key includes
-        # the private portion and encryption should occur with that
+        # the private portion and signing should occur with that
         if args.sign is None:
             signer = args.keys[0]
         else:
