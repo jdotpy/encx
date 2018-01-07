@@ -245,7 +245,7 @@ class KeyStoreManagement(BasePlugin):
         source = args.source
         if source == '-':
             source = sys.stdin.read()
-        keys = self.client.get_public_keys(source, use_store=False)
+        keys = self.client.get_public_keys([source], use_store=False)
         if not keys:
             logging.error('No public keys found!')
             return False
@@ -342,7 +342,6 @@ class Encryption(BasePlugin):
         parser.add_argument('-g', '--sign', default=False, nargs='?', help='Sign with specified private key')
 
     def encrypt(self, args):
-        print('sign:', type(args.sign), args.sign)
         source_data = self.client.load_file(args.source)
         if args.scheme not in schemes:
             print('Scheme not found!')
