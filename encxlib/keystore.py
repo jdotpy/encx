@@ -1,4 +1,5 @@
 from . import security
+import logging
 
 class KeyAliasNotFoundError(KeyError):
     pass
@@ -43,10 +44,17 @@ class KeyStore():
     def is_trusted_key(self, public_key):
         openssh_key = public_key.export_public_key('openssh')
         for name, entry in self.data.items():
-            if not entry.get('type') == 'public_key':
-                # We're only interested in public keys
+
+            if entry.get('type') == 'private_key':
+                # We're only interested in actual keys
+                entry_value = entry.get('public_key')
+            elif entry.get('type') == 'public_key':
+                entry_value = entry.get('value')
+            else:
+                # We're only interested in actual keys
                 continue
-            if entry.get('public_key') == openssh_key:
+
+            if entry_value == openssh_key:
                 logging.info('Confirming key is trusted with name: {}.'.format(name))
                 return True
         return False
