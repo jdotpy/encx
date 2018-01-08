@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name='encx',
-    version='0.3.0',
+    version='0.3.1',
     description='Encryption CLI tool and implementation of the encx file format.',
     author='KJ',
     author_email='jdotpy@users.noreply.github.com',
