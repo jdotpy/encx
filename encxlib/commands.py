@@ -542,10 +542,10 @@ class Keygen(BasePlugin):
         else:
             passphrase = args.passphrase
         
-        private_key = rsa.get_private_key(passphrase=passphrase)
+        private_key = rsa.export_private_key(passphrase=passphrase)
         
         if args.public:
-            rsa_pub = rsa.get_public_key()
+            rsa_pub = rsa.export_public_key()
             with open(args.public, 'wb') as pub_file:
                 pub_file.write(rsa_pub)
 
