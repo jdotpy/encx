@@ -524,7 +524,16 @@ class Keygen(BasePlugin):
         print(security.generate_uuid())
 
     def generate_random_string(self, args):
-        selections = [security.random_choice(args.source) for i in range(args.length)]
+        source = args.source
+        source = source.replace(':numbers:', string.digits)
+        source = source.replace(':digits:', string.digits)
+        source = source.replace(':letters:', string.ascii_letters)
+        source = source.replace(':lowercase:', string.ascii_lowercase)
+        source = source.replace(':uppercase:', string.ascii_uppercase)
+        source = source.replace(':symbols:', string.punctuation)
+        source = source.replace(':all:', string.punctuation + string.ascii_letters + string.digits)
+
+        selections = [security.random_choice(source) for i in range(args.length)]
         print(''.join(selections))
 
     def generate_rsa_key(self, args):
