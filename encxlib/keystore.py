@@ -1,4 +1,5 @@
 from . import security
+import logging
 
 class KeyAliasNotFoundError(KeyError):
     pass
@@ -43,10 +44,17 @@ class KeyStore():
     def is_trusted_key(self, public_key):
         openssh_key = public_key.export_public_key('openssh')
         for name, entry in self.data.items():
-            if not entry.get('type') == 'public_key':
-                # We're only interested in public keys
+
+            if entry.get('type') == 'private_key':
+                # We're only interested in actual keys
+                entry_value = entry.get('public_key')
+            elif entry.get('type') == 'public_key':
+                entry_value = entry.get('value')
+            else:
+                # We're only interested in actual keys
                 continue
-            if entry.get('public_key') == openssh_key:
+
+            if entry_value == openssh_key:
                 logging.info('Confirming key is trusted with name: {}.'.format(name))
                 return True
         return False
@@ -90,6 +98,8 @@ class KeyStore():
         matches = []
         aliases = [root_alias]
         seen_aliases = {root_alias: True}
+
+        # Resolve to entries
         while aliases:
             # Map to values
             next_aliases = []
@@ -111,7 +121,25 @@ class KeyStore():
                 else:
                     matches.append(entry)
             aliases = next_aliases
+
+        # Entries to KeyObj
         return matches
+
+    def _entries_to_keys(self, entries):
+        """
+            Note: This could be optimized to return only the portion needed
+            and when the cached public portion is returned would save the
+            time necessary to derive it from the private portion.
+            Not sure if I want this optimization done here or if it is a benefit
+            to have the flexibilty elsewhere to do multiple things with it.
+        """
+        keys = []
+        for entry in entries:
+            if entry['type'] == 'private_key':
+                keys.append(security.load_rsa_key(entry['value']))
+            else:
+                keys.append(security.RSA(entry['value']))
+        return keys
 
     def get_private_key(self, alias, require_match=True):
         matches = self.resolve_alias(alias)
@@ -124,20 +152,19 @@ class KeyStore():
             return None
         if entry['type'] != 'private_key':
             raise IncorrectKeyTypeError('Alias {} returned a public key!'.format(alias))
-
-        return security.load_rsa_key(entry['value'])
+        return self._entries_to_keys(matches)[0]
 
     def get_public_keys(self, alias, require_match=True):
         matches = self.resolve_alias(alias)
         if not matches and require_match:
             raise KeyAliasNotFoundError('Alias {} not found!'.format(alias))
-        return [security.RSA(match['value']) for match in matches]
+        return self._entries_to_keys(matches)
 
     def get_public_key(self, alias, require_match=True):
         matches = self.get_public_keys(alias, require_match=require_match)
         if not len(matches) == 1:
             raise MultipleKeysFoundError('Alias {} returned multiple entries!'.format(alias))
-        return matches[0]
+        return self._entries_to_keys(matches)[0]
 
     def get_entries(self, alias):
         return self.resolve_alias(alias)

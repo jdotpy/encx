@@ -278,7 +278,7 @@ class EncxClient():
         encx_file = ENCX.from_file(io.BytesIO(source))
         return encx_file.metadata
 
-    def decrypt_file(self, path, key=None, require_signature=None, allow_anonymous=False):
+    def decrypt_file(self, path, key=None, ignore_signature=False, require_signature=None, allow_anonymous=False):
         loaded_key = self.get_private_key(key, require=True)
         source = self.load_file(path)
         encx_file = ENCX.from_file(io.BytesIO(source))
@@ -289,7 +289,9 @@ class EncxClient():
 
         # Verify signature if necessary
         signature_data = encx_file.metadata.get('signature', None)
-        if signature_data:
+        if ignore_signature:
+            logging.info('Skipping signature verification')
+        elif signature_data:
             signature = signature_data.get('signature', None)
             signing_key_string = signature_data.get('public_key', None)
             signing_key = security.RSA(signing_key_string)
