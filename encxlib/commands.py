@@ -397,7 +397,8 @@ class Encryption(BasePlugin):
             help='Scheme to use to encrypt',
             default=DEFAULT_SCHEME.name
         )
-        parser.add_argument('-k', '--key', help='Key for encryption')
+        parser.add_argument('-x', '--decryption-key', dest='decryption_key', help='Key for decryption', default=None)
+        parser.add_argument('-k', '--key', nargs='*', dest='keys', help='Key for encryption', default=None)
         parser.add_argument('-r', '--validator', help='Validator to use')
 
     def edit(self, args):
@@ -405,7 +406,7 @@ class Encryption(BasePlugin):
         if args.initialize:
             data, metadata = bytes(), {} 
         else:
-            data, metadata = self.client.decrypt_file(args.source, args.key)
+            data, metadata = self.client.decrypt_file(args.source, args.decryption_key)
 
         # Do edit funtionality
         validator_name, validator = self.client.get_filetype_validator(
@@ -432,7 +433,7 @@ class Encryption(BasePlugin):
             args.source,
             result,
             scheme=scheme,
-            key=args.key,
+            keys=args.keys,
             overwrite=overwrite,
         )
 
