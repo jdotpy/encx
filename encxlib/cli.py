@@ -437,13 +437,12 @@ class EncxClient():
 
     def get_private_key(self, source, require=True):
         if not source:
-            match = self.default_rsa_key()
-            if not match and require:
+            source = self.default_rsa_key()
+            if not source and require:
                 raise ValueError('No private key specified and no default set!')
-        elif self.keystore.has_key(source):
-            match = self.keystore.get_private_key(source, require_match=False)
-        else:
-            match = security.load_rsa_key(source)
+        if self.keystore.has_key(source):
+            source = self.keystore.get_private_key(source, require_match=False)
+        match = security.load_rsa_key(source)
         if not match and require:
             raise ValueError('No private key matches given source: {}'.format(source))
         return match
@@ -456,7 +455,7 @@ class EncxClient():
         """
         if not sources:
             if self.default_rsa_key():
-                return [self.default_rsa_key()]
+                return [security.load_rsa_key(self.default_rsa_key())]
             else:
                 return []
 
