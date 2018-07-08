@@ -517,6 +517,20 @@ class Keygen(BasePlugin):
         )
         random_str_parser.set_defaults(func=self.generate_random_string)
 
+        extract_pub_key_parser = subparsers.add_parser('extract_public_key', help='Random string')
+        extract_pub_key_parser.add_argument(
+            'private_key',
+            help='Private key from which to extract the public portion',
+            default='-',
+        )
+        extract_pub_key_parser.add_argument(
+            '-o',
+            '--output',
+            help='Output format ("pem" - the default or "openssh")',
+            default='pem',
+        )
+        extract_pub_key_parser.set_defaults(func=self.extract_public_key)
+
     def keygen(self, args):
         args.func(args)
 
@@ -530,8 +544,23 @@ class Keygen(BasePlugin):
     def generate_uuid(self, args):
         print(security.generate_uuid())
 
+    def extract_public_key(self, args):
+        private_key_bytes = self.client.load_file(args.private_key)
+        rsa_key = security.load_rsa_key(private_key_bytes.decode('utf-8'))
+        exported_pub_key = rsa_key.export_public_key(args.output)
+        print(exported_pub_key)
+
     def generate_random_string(self, args):
-        selections = [security.random_choice(args.source) for i in range(args.length)]
+        source = args.source
+        source = source.replace(':numbers:', string.digits)
+        source = source.replace(':digits:', string.digits)
+        source = source.replace(':letters:', string.ascii_letters)
+        source = source.replace(':lowercase:', string.ascii_lowercase)
+        source = source.replace(':uppercase:', string.ascii_uppercase)
+        source = source.replace(':symbols:', string.punctuation)
+        source = source.replace(':all:', string.punctuation + string.ascii_letters + string.digits)
+
+        selections = [security.random_choice(source) for i in range(args.length)]
         print(''.join(selections))
 
     def generate_rsa_key(self, args):

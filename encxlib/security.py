@@ -28,8 +28,10 @@ def is_key_string(s):
     return False
 
 def load_rsa_key(source, passphrase=None, require_private=True):
+    path = True
     try:
         if is_key_string(source):
+            path = False
             key_contents = source
         elif require_private:
             key_contents = read_private_path(source)
@@ -39,7 +41,11 @@ def load_rsa_key(source, passphrase=None, require_private=True):
         return None
     if 'ENCRYPTED' in key_contents:
         if passphrase is None:
-            passphrase = getpass('Enter the passphrase for "{}": '.format(source))
+            if path:
+                prompt = 'Enter the passphrase for "{}": '.format(source)
+            else:
+                prompt = 'Enter the passphrase for provided key: '
+            passphrase = getpass(prompt)
     return RSA(key_contents, passphrase)
 
 def generate_uuid():
@@ -223,6 +229,8 @@ class RSA():
         elif format == 'openssh':
             encoding = serialization.Encoding.OpenSSH
             key_format = serialization.PublicFormat.OpenSSH
+        else:
+            raise ValueError('Unsupported output format for a public key: {}'.format(format))
 
         public_key = self._get_public_key()
         exported = public_key.public_bytes(
